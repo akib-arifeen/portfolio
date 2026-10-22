@@ -1,0 +1,20 @@
+/* Hallmark · the laptop layer — same tokens as the page, evening screen palette */
+
+.desk {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-nav);
+  background: var(--color-desk);
+  color: var(--color-desk-ink);
+  outline: none;
+  /* crossfades over the camera's dive into the laptop screen */
+  animation: desk-in 560ms var(--ease-out) both;
+}
+.desk[data-leaving="true"] { animation: desk-out var(--dur-short) var(--ease-in) both; }
+@keyframes desk-in { from { opacity: 0; transform: scale(0.985); } to { opacity: 1; transform: none; } }
+@keyframes desk-out { to { opacity: 0; transform: scale(0.985); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .desk, .desk[data-leaving="true"] { animation-duration: 150ms; animation-name: desk-fade; }
+  @keyframes desk-fade { from { opacity: 0; } to { opacity: 1; } }
+}

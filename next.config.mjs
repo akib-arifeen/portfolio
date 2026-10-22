@@ -1,24 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
+  reactStrictMode: true,
+  // v1 of this site served the CV at this path; keep links to it working.
+  async redirects() {
+    return [{ source: "/Akib_Arifeen_Resume.pdf", destination: "/akib-arifeen-cv.pdf", permanent: false }];
   },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  images: {
-    unoptimized: true,
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'plus.unsplash.com',
-      }
-    ],
-  },
-}
-
-export default nextConfig
+};
+export default nextConfig;

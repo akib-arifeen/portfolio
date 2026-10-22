@@ -1,0 +1,72 @@
+/* Ask Akib · docked panel at the bottom centre of the stage. Tokens only. */
+
+.twin {
+  position: fixed;
+  z-index: calc(var(--z-panel) + 1);
+  left: 50%;
+  bottom: max(var(--space-md), env(safe-area-inset-bottom));
+  translate: -50% 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: min(560px, 100vw - 2 * var(--gutter));
+  max-height: min(28rem, 52svh);
+  padding: var(--space-md);
+  background: color-mix(in oklab, var(--color-paper) 90%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  backdrop-filter: blur(14px) saturate(1.1);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  box-shadow: 0 1rem 2.5rem color-mix(in oklab, var(--color-ink) 18%, transparent);
+  color: var(--color-ink);
+  animation: twin-in var(--dur-long) var(--ease-out) both;
+}
+@media (max-width: 59.99rem) { .twin { max-height: 45svh; } }
+@keyframes twin-in { from { opacity: 0; transform: translateY(1rem); } to { opacity: 1; transform: none; } }
+
+.twin__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); }
+.twin__title { font-size: var(--text-md); margin: 0; }
+.twin__close {
+  display: grid; place-items: center;
+  width: 2.75rem; height: 2.75rem; margin: -0.5rem -0.5rem -0.5rem 0;
+  border: 0; border-radius: 999px; background: transparent; color: var(--color-ink-2); cursor: pointer;
+  transition: background-color var(--dur-micro) var(--ease-out);
+}
+.twin__close svg { width: 1.25rem; height: 1.25rem; }
+@media (hover: hover) and (pointer: fine) { .twin__close:hover { background: var(--color-paper-2); color: var(--color-ink); } }
+
+.twin__log { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: var(--space-md); }
+.twin__hint { margin: 0; font-size: var(--text-sm); color: var(--color-muted); }
+.twin__turn { display: flex; flex-direction: column; gap: var(--space-2xs); align-items: flex-start; }
+.twin__q { margin: 0; align-self: flex-end; max-width: 85%; padding: var(--space-2xs) var(--space-sm); border-radius: var(--radius-md); background: var(--color-paper-3); font-size: var(--text-sm); }
+.twin__a { margin: 0; font-size: var(--text-base); line-height: 1.45; color: var(--color-ink); }
+.twin__src { margin: 0; font-size: var(--text-sm); color: var(--color-muted); }
+.twin__action { margin-top: var(--space-2xs); text-decoration: none; }
+.twin__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.twin__chips { display: flex; flex-wrap: nowrap; gap: var(--space-xs); margin: 0; padding: 0 0 var(--space-2xs); list-style: none; overflow-x: auto; scrollbar-width: thin; }
+.twin__chips li { flex: none; }
+.twin__chips .chip { min-height: 2.75rem; }
+
+.twin__form { display: flex; gap: var(--space-xs); }
+.twin__input {
+  flex: 1 1 auto; min-width: 0; min-height: 2.75rem; padding: 0 var(--space-md);
+  border: var(--rule-hair) solid var(--color-rule); border-radius: 999px;
+  background: var(--color-paper); color: var(--color-ink); font: inherit; font-size: var(--text-base);
+}
+.twin__input::placeholder { color: var(--color-muted); }
+.twin__input:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.twin__send { min-height: 2.75rem; }
+
+.twin__sound {
+  align-self: flex-start; min-height: 2.75rem; padding: 0 var(--space-xs); margin: calc(-1 * var(--space-2xs)) 0 calc(-1 * var(--space-xs));
+  border: 0; background: transparent; color: var(--color-ink-2); font: inherit; font-size: var(--text-sm);
+  text-decoration: underline; text-decoration-color: var(--color-rule); text-underline-offset: 0.25em; cursor: pointer;
+}
+.twin__sound[aria-pressed="true"] { text-decoration: none; color: var(--color-muted); }
+.twin__sound:focus-visible, .twin__close:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .twin { animation: twin-fade 150ms linear both; }
+  @keyframes twin-fade { from { opacity: 0; } to { opacity: 1; } }
+}

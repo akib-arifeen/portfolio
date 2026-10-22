@@ -1,44 +1,42 @@
-import type React from "react"
-import "./globals.css"
-import type { Metadata } from "next"
-import { Inter, Kalam, Playfair_Display } from "next/font/google"
-import StickyNote from "@/components/sticky-note"
-import DesktopFolders from "@/components/desktop-folders"
-import MenuBar from "@/components/menu-bar"
-import DockNavigation from "@/components/dock-navigation"
-import WindowManager from "@/components/window-manager"
+import type { Metadata, Viewport } from "next";
+import { Fraunces, Geist, Geist_Mono } from "next/font/google";
+import "../tokens.css";
+import "./globals.css";
+import "./desk.css";
+import "./booth3d.css";
 
-const inter = Inter({ subsets: ["latin"] })
-const kalam = Kalam({
-  weight: ["300", "400", "700"],
-  subsets: ["latin"],
-  variable: "--font-kalam",
-})
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  variable: "--font-playfair",
-})
+const fraunces = Fraunces({ subsets: ["latin"], axes: ["opsz", "SOFT"], variable: "--font-fraunces", display: "swap" });
+const geist = Geist({ subsets: ["latin"], variable: "--font-geist", display: "swap" });
+const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono", display: "swap" });
+
+const siteDescription = "Software engineer in Hong Kong building AI products end to end: video generation, voice, photobooths and the infrastructure under them.";
 
 export const metadata: Metadata = {
-  title: "Akib's Portfolio",
-  description: "Software Developer Portfolio",
-}
+  metadataBase: new URL("https://akibarifeen.vercel.app"),
+  applicationName: "Akib Arifeen",
+  title: { default: "Akib Arifeen · Software engineer, Hong Kong", template: "%s · Akib Arifeen" },
+  description: siteDescription,
+  openGraph: {
+    type: "website",
+    siteName: "Akib Arifeen",
+    title: "Akib Arifeen · Software engineer, Hong Kong",
+    description: siteDescription,
+    url: "/",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Akib Arifeen · Software engineer, Hong Kong",
+    description: siteDescription,
+  },
+  icons: { icon: "/icon.svg", apple: "/apple-icon.png" },
+};
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export const viewport: Viewport = { themeColor: "#f4efe6" };
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className={`${inter.className} ${kalam.variable} ${playfair.variable}`}>
-        <MenuBar />
-        <StickyNote />
-        <DesktopFolders />
-        <WindowManager />
-        {children}
-        <DockNavigation />
-      </body>
+    <html lang="en" className={`${fraunces.variable} ${geist.variable} ${geistMono.variable}`}>
+      <body>{children}</body>
     </html>
-  )
+  );
 }

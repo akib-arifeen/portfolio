@@ -1,0 +1,101 @@
+/* Hallmark · the 3D photobooth — its screen, its HUD, the walk-up curtain. Tokens only. */
+
+/* booth mode: the stage becomes the whole window; the page steps back */
+body[data-booth="true"] { overflow: hidden; }
+body[data-booth="true"] .hero__stage { position: fixed; inset: 0; height: auto; z-index: var(--z-panel); background: var(--color-paper); }
+body[data-booth="true"] .nav,
+body[data-booth="true"] .hero__copy,
+body[data-booth="true"] .hero__clock,
+body[data-booth="true"] .panel { visibility: hidden; }
+
+.curtain {
+  position: fixed; inset: 0; z-index: var(--z-nav);
+  background: var(--color-paper);
+  opacity: 0; pointer-events: none;
+  transition: opacity 260ms var(--ease-in-out);
+}
+.curtain[data-on="true"] { opacity: 1; pointer-events: auto; }
+
+/* ── the touchscreen on the booth ───────────────────────────────── */
+.bscreen {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.6em;
+  background: var(--color-terminal);
+  color: var(--color-booth-ink);
+  font-family: var(--font-body);
+  line-height: 1.35;
+  user-select: none;
+}
+.bscreen__intro, .bscreen__center {
+  position: absolute; inset: 0;
+  display: grid; align-content: center; justify-items: center; gap: 0.8em;
+  padding: 1.6em 2em; text-align: center;
+}
+.bscreen__big { font-family: var(--font-display); font-size: 2.6em; line-height: 1; letter-spacing: -0.02em; font-variation-settings: "SOFT" 90, "opsz" 72; }
+.bscreen__line { font-size: 1.05em; color: var(--color-booth-muted); max-width: 30em; animation: bscreen-in var(--dur-long) var(--ease-out) both; }
+.bscreen__small { font-size: 0.72em; color: var(--color-muted); max-width: 40em; }
+.bscreen__row { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6em; }
+@keyframes bscreen-in { from { opacity: 0; transform: translateY(0.3em); } to { opacity: 1; transform: none; } }
+
+.bbtn {
+  min-height: 2.6em; padding: 0 1.3em;
+  border: 1px solid var(--color-booth-rule); border-radius: 999px;
+  background: transparent; color: var(--color-booth-ink);
+  font: inherit; font-size: 1em; white-space: nowrap; cursor: pointer;
+  transition: background-color var(--dur-micro) var(--ease-out), transform var(--dur-micro) var(--ease-out);
+}
+.bbtn:active { transform: scale(0.97); }
+.bbtn--go { background: var(--color-accent-strong); border-color: var(--color-accent-strong); color: var(--color-accent-ink); font-weight: 500; } /* 4.77:1, not the 3.43:1 of plain accent */
+@media (hover: hover) and (pointer: fine) { .bbtn:hover { background: var(--color-booth-2); } .bbtn--go:hover { background: var(--color-booth-2); border-color: var(--color-booth-2); } }
+.bscreen :focus-visible { outline: 2px solid var(--color-paper); outline-offset: 2px; }
+
+.bscreen__pose { position: absolute; inset: 0; }
+.bscreen__feed { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.bscreen__feed--still { transform: none; }
+.bscreen__controls {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 0.8em;
+  padding: 0.8em 1em;
+  background: var(--color-booth-shadow);
+}
+.bscreen__looks { display: flex; flex-wrap: wrap; gap: 0.4em; }
+.blook {
+  padding: 0.35em 0.8em; border: 1px solid var(--color-booth-rule); border-radius: 999px;
+  background: transparent; color: var(--color-booth-ink); font: inherit; font-size: 0.82em; white-space: nowrap; cursor: pointer;
+}
+.blook[aria-checked="true"] { background: var(--color-paper); border-color: var(--color-paper); color: var(--color-ink); }
+.bshutter {
+  flex: none; width: 3.4em; height: 3.4em; display: grid; place-items: center;
+  border: 0.22em solid var(--color-paper); border-radius: 50%; background: transparent; cursor: pointer;
+}
+.bshutter span { width: 2.3em; height: 2.3em; border-radius: 50%; background: var(--color-accent); transition: transform var(--dur-micro) var(--ease-out); }
+.bshutter:active span { transform: scale(0.88); }
+.bscreen__count {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-family: var(--font-display); font-size: 9em; line-height: 1; color: var(--color-paper);
+  text-shadow: 0 0.05em 0.4em var(--color-booth-shadow);
+  animation: bcount 900ms var(--ease-out) both;
+}
+@keyframes bcount { from { opacity: 0; transform: scale(1.4); } 25% { opacity: 1; transform: scale(1); } to { opacity: 0.6; transform: scale(0.94); } }
+.bscreen__bar { width: 60%; height: 0.35em; border-radius: 999px; background: var(--color-desk-2); overflow: hidden; }
+.bscreen__bar span { display: block; width: 35%; height: 100%; border-radius: inherit; background: var(--color-accent); animation: bbar 1.4s var(--ease-in-out) infinite alternate; }
+@keyframes bbar { from { transform: translateX(-10%); } to { transform: translateX(195%); } }
+.bscreen__arrow { font-size: 3em; line-height: 1; color: var(--color-accent); animation: barrow 900ms var(--ease-in-out) infinite alternate; }
+@keyframes barrow { from { transform: translateY(-0.1em); } to { transform: translateY(0.2em); } }
+
+/* ── HUD: the only 2D chrome in booth mode ─────────────────────── */
+.bhud { position: fixed; inset: 0; z-index: var(--z-nav); pointer-events: none; }
+.bhud > * { pointer-events: auto; }
+.bhud__away { position: absolute; top: var(--space-md); right: var(--gutter); }
+.bhud__done {
+  position: absolute; left: var(--gutter); right: var(--gutter); bottom: max(var(--space-lg), env(safe-area-inset-bottom));
+  display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-xs);
+  animation: bscreen-in var(--dur-long) var(--ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bscreen__line, .bscreen__count, .bhud__done { animation-duration: 150ms; }
+  .bscreen__bar span, .bscreen__arrow { animation: none; }
+  .curtain { transition-duration: 150ms; }
+}

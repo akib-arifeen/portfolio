@@ -1,0 +1,127 @@
+/* akibOS · apps-tools.css — worker-owned. Tokens only (tokens.css); no raw colours. */
+
+/* ── Terminal ───────────────────────────────────────────────────── */
+.os-term {
+  --term-out: color-mix(in oklch, var(--color-terminal-ink) 88%, var(--color-terminal));
+  --term-echo: var(--color-terminal-ink);
+  --term-dim: color-mix(in oklch, var(--color-terminal-ink) 66%, var(--color-terminal));
+  --term-accent: color-mix(in oklch, var(--color-accent) 88%, var(--color-terminal-ink));
+  --term-ok: color-mix(in oklch, var(--os-zoom) 72%, var(--color-terminal-ink));
+  --term-err: color-mix(in oklch, var(--os-close) 78%, var(--color-terminal-ink));
+
+  box-sizing: border-box;
+  height: 100%;
+  overflow-y: auto;
+  padding: 14px;
+  background: var(--color-terminal);
+  color: var(--term-out);
+  font-family: var(--font-outlier);
+  font-size: 13px;
+  line-height: 1.55;
+  cursor: text;
+}
+.os-term__line {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--term-out);
+}
+.os-term__line[data-tone="echo"] { color: var(--term-echo); font-weight: 600; }
+.os-term__line[data-tone="dim"] { color: var(--term-dim); }
+.os-term__line[data-tone="accent"] { color: var(--term-accent); }
+.os-term__line[data-tone="ok"] { color: var(--term-ok); }
+.os-term__line[data-tone="err"] { color: var(--term-err); }
+
+.os-term__row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6ch;
+  min-width: 0;
+}
+.os-term__prompt {
+  flex: none;
+  color: var(--term-echo);
+  font-weight: 600;
+  white-space: pre;
+}
+.os-term__input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: none;
+  color: var(--term-echo);
+  caret-color: var(--term-accent);
+  font: inherit;
+}
+.os-term__input:focus { outline: none; }
+.os-term__input:focus-visible {
+  outline: 1px solid var(--color-focus);
+  outline-offset: 0;
+}
+@container app (max-width: 520px) {
+  .os-term__row { min-height: 44px; align-items: center; }
+}
+
+/* ── About This Laptop ──────────────────────────────────────────── */
+.os-about {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100%;
+  padding: 20px 28px 16px;
+  background: var(--os-window);
+  color: var(--os-text);
+  font-family: var(--os-font);
+  text-align: center;
+}
+.os-about__avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px var(--os-hairline);
+}
+.os-about__name { margin: 10px 0 0; font-size: 22px; font-weight: 700; line-height: 1.2; }
+.os-about__version { margin: 2px 0 0; color: var(--os-text-2); font-size: 13px; }
+.os-about__specs {
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.os-about__spec {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+  gap: 12px;
+}
+.os-about__spec dt { margin: 0; text-align: right; color: var(--os-text-2); }
+.os-about__spec dd { margin: 0; text-align: left; font-weight: 500; }
+.os-about__actions { display: flex; gap: 10px; margin-top: auto; padding-top: 14px; }
+.os-about__btn {
+  min-height: 30px;
+  padding: 0 16px;
+  border: 1px solid var(--os-hairline);
+  border-radius: var(--os-radius-menu);
+  background: color-mix(in oklch, var(--os-text) 6%, var(--os-window));
+  color: var(--os-text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background var(--dur-micro) var(--ease-out);
+}
+.os-about__btn:hover { background: color-mix(in oklch, var(--os-text) 12%, var(--os-window)); }
+.os-about__btn--primary { border-color: var(--os-select); background: var(--os-select); color: var(--os-select-ink); }
+.os-about__btn--primary:hover { background: color-mix(in oklch, var(--os-select) 88%, var(--os-text)); }
+.os-about__btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.os-about__fine { margin: 10px 0 0; color: var(--os-text-2); font-size: 11px; }
+@container app (max-width: 520px) {
+  .os-about__btn { min-height: 44px; padding: 0 22px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .os-about__btn { transition: none; }
+}

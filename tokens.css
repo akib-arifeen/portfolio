@@ -1,0 +1,175 @@
+/* Hallmark · genre: editorial · macrostructure: Marquee Hero · H1 knobs: size=xl, alignment=left-bias, underlay=none
+ * theme: custom · vibe: "cosy late-evening studio, lamp-warm, calm" · paper: oklch(95.5% 0.012 75) · accent: oklch(63% 0.15 33)
+ * display: Fraunces (roman) · body: Geist · outlier: Geist Mono (studio clock only) · axes: light / roman-serif / warm
+ * enrichment: custom interactive 3D diorama (React Three Fiber) · nav: N9 edge-aligned · footer: Ft6 letter close
+ * studied: no · context: inferred from PORTFOLIO_PLAN.md
+ */
+
+:root {
+  /* ── Colour · warm paper, warm ink, one coral accent ───────────── */
+  --color-paper:      oklch(95.5% 0.012 75);
+  --color-paper-2:    oklch(92.5% 0.015 75);
+  --color-paper-3:    oklch(89% 0.018 72);
+  --color-ink:        oklch(22% 0.012 60);
+  --color-ink-2:      oklch(38% 0.012 60);
+  --color-muted:      oklch(52% 0.012 62);
+  --color-rule:       oklch(80% 0.014 70);
+  --color-rule-2:     oklch(87% 0.012 72);
+  --color-accent:     oklch(63% 0.15 33);
+  --color-accent-ink: oklch(97% 0.01 75);
+  /* accent dark enough for --color-accent-ink text: 4.77:1 (WCAG AA); plain --color-accent gives only 3.43:1 */
+  --color-accent-strong: oklch(55% 0.15 33);
+  --color-focus:      oklch(58% 0.19 33);
+  --color-scrim:      oklch(22% 0.012 60 / 0.08);
+
+  /* the laptop — a darker, evening screen and its app-icon tints */
+  --color-desk:       oklch(30% 0.03 50);
+  --color-desk-2:     oklch(36% 0.03 50);
+  --color-desk-ink:   oklch(93% 0.015 75);
+  --color-desk-mark:  oklch(36% 0.035 50);
+  --color-icon-amber: oklch(78% 0.12 75);
+  --color-icon-sage:  oklch(68% 0.07 140);
+  --color-icon-blue:  oklch(62% 0.08 245);
+  --color-icon-plum:  oklch(52% 0.09 340);
+  --color-terminal:   oklch(20% 0.01 60);
+  --color-terminal-ink: oklch(88% 0.08 140);
+
+  /* the photobooth layer — the booth's coral, deepened so cream text reads on it */
+  --color-booth:        oklch(42% 0.12 33);
+  --color-booth-2:      oklch(48% 0.12 33);
+  --color-booth-ink:    oklch(96% 0.012 75);
+  --color-booth-muted:  oklch(86% 0.03 60);
+  --color-booth-rule:   oklch(62% 0.1 35);
+  --color-booth-shadow: oklch(20% 0.06 33 / 0.5);
+
+  /* ── akibOS — the laptop layer: macOS-like chrome and glass, light + dark.
+     The chrome worker owns these VALUES and may add --os-* tokens here; the names below are the contract. ── */
+  --os-font: -apple-system, BlinkMacSystemFont, system-ui, var(--font-geist), sans-serif;
+  --os-text: oklch(22% 0.012 60);
+  --os-text-2: oklch(44% 0.012 60);
+  --os-window: oklch(98.5% 0.004 75);
+  --os-sidebar: oklch(95% 0.008 75 / 0.78);
+  --os-glass: oklch(98% 0.006 75 / 0.62);
+  --os-glass-strong: oklch(98% 0.006 75 / 0.84);
+  --os-hairline: oklch(22% 0.012 60 / 0.12);
+  --os-select: var(--color-accent-strong);
+  --os-select-ink: oklch(99% 0.004 75);
+  --os-close: oklch(66% 0.21 27);
+  --os-minimize: oklch(82% 0.16 82);
+  --os-zoom: oklch(73% 0.19 145);
+  --os-shadow: 0 22px 70px oklch(15% 0.02 50 / 0.34), 0 0 0 0.5px oklch(15% 0.02 50 / 0.3);
+  --os-radius-window: 12px;
+  --os-radius-menu: 8px;
+  --os-shadow-unfocused: 0 10px 34px oklch(15% 0.02 50 / 0.2), 0 0 0 0.5px oklch(15% 0.02 50 / 0.22);
+  --os-dock-radius: 22px;
+  --os-tip: oklch(26% 0.014 60 / 0.9);
+  --os-tip-ink: oklch(96% 0.008 75);
+  --os-menu-shadow: 0 12px 40px oklch(15% 0.02 50 / 0.3), 0 0 0 0.5px oklch(15% 0.02 50 / 0.26);
+  --os-icon-shadow: oklch(15% 0.02 50 / 0.32);
+  --os-icon-glyph: oklch(99% 0.004 75);
+  --os-icon-paper: oklch(98.5% 0.006 80);
+  /* wallpaper */
+  --os-wall-a: oklch(93% 0.035 80);
+  --os-wall-b: oklch(86% 0.07 62);
+  --os-wall-c: oklch(78% 0.11 45);
+  --os-wall-glow: oklch(84% 0.12 55 / 0.7);
+  --os-wall-dune-1: oklch(76% 0.1 52 / 0.55);
+  --os-wall-dune-2: oklch(68% 0.12 42 / 0.5);
+  --os-wall-dune-3: oklch(58% 0.1 34 / 0.45);
+  --os-wall-dune-4: oklch(48% 0.08 30 / 0.4);
+  /* app icons: gradient top (a) and bottom (b) */
+  --os-icon-files-a: oklch(80% 0.1 235);
+  --os-icon-files-b: oklch(60% 0.14 250);
+  --os-icon-browser-a: oklch(80% 0.1 210);
+  --os-icon-browser-b: oklch(58% 0.13 240);
+  --os-icon-mail-a: oklch(78% 0.1 245);
+  --os-icon-mail-b: oklch(58% 0.14 262);
+  --os-icon-notes-a: oklch(90% 0.12 90);
+  --os-icon-notes-b: oklch(78% 0.15 75);
+  --os-icon-photos-a: oklch(95% 0.03 85);
+  --os-icon-photos-b: oklch(86% 0.06 75);
+  --os-icon-music-a: oklch(72% 0.17 28);
+  --os-icon-music-b: oklch(58% 0.19 20);
+  --os-icon-calendar-a: oklch(99% 0.004 75);
+  --os-icon-calendar-b: oklch(93% 0.008 75);
+  --os-icon-playground-a: oklch(66% 0.14 305);
+  --os-icon-playground-b: oklch(48% 0.16 295);
+  --os-icon-terminal-a: oklch(32% 0.012 60);
+  --os-icon-terminal-b: oklch(18% 0.01 60);
+  --os-icon-preview-a: oklch(80% 0.1 160);
+  --os-icon-preview-b: oklch(58% 0.11 175);
+  --os-icon-about-a: oklch(72% 0.14 40);
+  --os-icon-about-b: oklch(55% 0.15 30);
+
+  /* ── Type ──────────────────────────────────────────────────────── */
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-body:    var(--font-geist), ui-sans-serif, sans-serif;
+  --font-outlier: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* major third, 16px base */
+  --text-sm:   0.8125rem;
+  --text-base: 1rem;
+  --text-md:   1.25rem;
+  --text-lg:   1.5625rem;
+  --text-xl:   1.9531rem;
+  --text-display: clamp(2.5rem, 4.2vw + 1rem, 5.25rem);
+
+  --leading-display: 1.04;
+  --leading-body: 1.6;
+
+  /* ── Space · 4pt scale ─────────────────────────────────────────── */
+  --space-2xs: 0.25rem;
+  --space-xs:  0.5rem;
+  --space-sm:  0.75rem;
+  --space-md:  1rem;
+  --space-lg:  1.5rem;
+  --space-xl:  2.5rem;
+  --space-2xl: 4rem;
+  --space-3xl: 6rem;
+  --space-4xl: 9rem;
+  --gutter: clamp(1.25rem, 4vw, 3.5rem);
+
+  /* ── Lines, radius ─────────────────────────────────────────────── */
+  --rule-hair: 1px;
+  --rule-thick: 2px;
+  --radius-sm: 6px;
+  --radius-md: 12px;
+
+  /* ── Motion ────────────────────────────────────────────────────── */
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in:     cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-micro: 120ms;
+  --dur-short: 220ms;
+  --dur-long:  420ms;
+
+  /* ── Layers ────────────────────────────────────────────────────── */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-panel: 20;
+  --z-nav: 30;
+}
+
+/* akibOS dark appearance: the shell sets data-appearance on .os */
+.os[data-appearance="dark"] {
+  --os-text: oklch(95% 0.01 75);
+  --os-text-2: oklch(76% 0.012 70);
+  --os-window: oklch(24% 0.014 55);
+  --os-sidebar: oklch(28% 0.016 55 / 0.78);
+  --os-glass: oklch(26% 0.02 50 / 0.6);
+  --os-glass-strong: oklch(22% 0.02 50 / 0.82);
+  --os-hairline: oklch(96% 0.01 75 / 0.16);
+  --os-shadow: 0 22px 70px oklch(8% 0.02 50 / 0.6), 0 0 0 0.5px oklch(96% 0.01 75 / 0.22);
+  --os-shadow-unfocused: 0 10px 34px oklch(8% 0.02 50 / 0.45), 0 0 0 0.5px oklch(96% 0.01 75 / 0.14);
+  --os-menu-shadow: 0 12px 40px oklch(8% 0.02 50 / 0.55), 0 0 0 0.5px oklch(96% 0.01 75 / 0.2);
+  --os-tip: oklch(94% 0.01 75 / 0.92);
+  --os-tip-ink: oklch(22% 0.012 60);
+  --os-wall-a: oklch(20% 0.03 330);
+  --os-wall-b: oklch(26% 0.05 345);
+  --os-wall-c: oklch(34% 0.09 20);
+  --os-wall-glow: oklch(58% 0.17 33 / 0.55);
+  --os-wall-dune-1: oklch(40% 0.09 15 / 0.6);
+  --os-wall-dune-2: oklch(32% 0.07 350 / 0.6);
+  --os-wall-dune-3: oklch(25% 0.05 335 / 0.6);
+  --os-wall-dune-4: oklch(19% 0.035 325 / 0.6);
+}
