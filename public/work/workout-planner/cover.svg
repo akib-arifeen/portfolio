@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" role="img" aria-label="A weekly plan of workout sessions on a calendar grid, with a dumbbell and a voice wave beside it.">
+  <rect width="1200" height="750" fill="oklch(92.5% 0.015 75)"/>
+  <rect x="120" y="100" width="640" height="520" rx="24" fill="oklch(97.5% 0.008 75)" stroke="oklch(80% 0.014 70)" stroke-width="3"/>
+  <rect x="120" y="100" width="640" height="76" rx="24" fill="oklch(42% 0.12 33)"/>
+  <g fill="oklch(97.5% 0.008 75)">
+    <rect x="156" y="130" width="40" height="14" rx="7"/><rect x="236" y="130" width="40" height="14" rx="7"/>
+    <rect x="316" y="130" width="40" height="14" rx="7"/><rect x="396" y="130" width="40" height="14" rx="7"/>
+    <rect x="476" y="130" width="40" height="14" rx="7"/><rect x="556" y="130" width="40" height="14" rx="7"/>
+    <rect x="636" y="130" width="40" height="14" rx="7"/>
+  </g>
+  <g>
+    <rect x="148" y="204" width="76" height="160" rx="12" fill="oklch(86% 0.04 33)"/>
+    <rect x="228" y="204" width="76" height="160" rx="12" fill="oklch(94% 0.012 75)"/>
+    <rect x="308" y="204" width="76" height="160" rx="12" fill="oklch(63% 0.15 33)"/>
+    <rect x="388" y="204" width="76" height="160" rx="12" fill="oklch(94% 0.012 75)"/>
+    <rect x="468" y="204" width="76" height="160" rx="12" fill="oklch(86% 0.04 33)"/>
+    <rect x="548" y="204" width="76" height="160" rx="12" fill="oklch(94% 0.012 75)"/>
+    <rect x="628" y="204" width="76" height="160" rx="12" fill="oklch(94% 0.012 75)"/>
+  </g>
+  <g fill="oklch(52% 0.012 62)">
+    <rect x="148" y="400" width="250" height="14" rx="7"/><rect x="148" y="430" width="200" height="14" rx="7"/>
+    <rect x="148" y="460" width="270" height="14" rx="7"/><rect x="148" y="490" width="160" height="14" rx="7"/>
+  </g>
+  <rect x="148" y="540" width="140" height="44" rx="22" fill="oklch(42% 0.12 33)"/>
+  <g transform="translate(940 360) rotate(-18)">
+    <rect x="-170" y="-14" width="340" height="28" rx="14" fill="oklch(52% 0.012 62)"/>
+    <rect x="-210" y="-70" width="56" height="140" rx="16" fill="oklch(42% 0.12 33)"/>
+    <rect x="-246" y="-48" width="40" height="96" rx="12" fill="oklch(63% 0.15 33)"/>
+    <rect x="154" y="-70" width="56" height="140" rx="16" fill="oklch(42% 0.12 33)"/>
+    <rect x="206" y="-48" width="40" height="96" rx="12" fill="oklch(63% 0.15 33)"/>
+  </g>
+  <g fill="none" stroke="oklch(63% 0.15 33)" stroke-width="8" stroke-linecap="round">
+    <path d="M830 560 Q860 600 830 640"/><path d="M870 540 Q920 600 870 660"/><path d="M910 520 Q980 600 910 680"/>
+  </g>
+</svg>

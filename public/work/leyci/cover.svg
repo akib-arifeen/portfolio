@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" role="img" aria-label="A wireframe of a clothing storefront: a navigation bar, a wide hero panel with a headline, and a row of product cards with names and prices as grey bars.">
+  <rect width="1200" height="750" fill="oklch(92.5% 0.015 75)"/>
+  <rect x="140" y="70" width="920" height="610" rx="20" fill="oklch(97.5% 0.008 75)" stroke="oklch(80% 0.014 70)" stroke-width="3"/>
+  <rect x="140" y="70" width="920" height="64" rx="20" fill="oklch(94% 0.012 75)"/>
+  <rect x="176" y="92" width="96" height="20" rx="10" fill="oklch(22% 0.012 60)"/>
+  <rect x="640" y="96" width="70" height="12" rx="6" fill="oklch(70% 0.014 70)"/>
+  <rect x="730" y="96" width="70" height="12" rx="6" fill="oklch(70% 0.014 70)"/>
+  <rect x="820" y="96" width="70" height="12" rx="6" fill="oklch(70% 0.014 70)"/>
+  <rect x="940" y="88" width="84" height="28" rx="14" fill="oklch(63% 0.15 33)"/>
+  <rect x="176" y="160" width="848" height="270" rx="12" fill="oklch(86% 0.03 60)"/>
+  <path d="M176 400 C 300 330 420 440 560 380 S 800 330 1024 400 L1024 418 Q1024 430 1012 430 L188 430 Q176 430 176 418 Z" fill="oklch(78% 0.06 60)"/>
+  <rect x="216" y="226" width="300" height="26" rx="13" fill="oklch(22% 0.012 60)"/>
+  <rect x="216" y="268" width="220" height="26" rx="13" fill="oklch(22% 0.012 60)"/>
+  <rect x="216" y="318" width="360" height="12" rx="6" fill="oklch(52% 0.012 62)"/>
+  <rect x="216" y="346" width="132" height="36" rx="18" fill="oklch(42% 0.12 33)"/>
+  <g>
+    <rect x="176" y="464" width="196" height="150" rx="10" fill="oklch(88% 0.02 70)"/>
+    <rect x="176" y="626" width="120" height="12" rx="6" fill="oklch(52% 0.012 62)"/>
+    <rect x="176" y="648" width="64" height="12" rx="6" fill="oklch(70% 0.014 70)"/>
+    <rect x="396" y="464" width="196" height="150" rx="10" fill="oklch(84% 0.03 140)"/>
+    <rect x="396" y="626" width="120" height="12" rx="6" fill="oklch(52% 0.012 62)"/>
+    <rect x="396" y="648" width="64" height="12" rx="6" fill="oklch(70% 0.014 70)"/>
+    <rect x="616" y="464" width="196" height="150" rx="10" fill="oklch(86% 0.04 33)"/>
+    <rect x="616" y="626" width="120" height="12" rx="6" fill="oklch(52% 0.012 62)"/>
+    <rect x="616" y="648" width="64" height="12" rx="6" fill="oklch(70% 0.014 70)"/>
+    <rect x="836" y="464" width="188" height="150" rx="10" fill="oklch(90% 0.03 85)"/>
+    <rect x="836" y="626" width="120" height="12" rx="6" fill="oklch(52% 0.012 62)"/>
+    <rect x="836" y="648" width="64" height="12" rx="6" fill="oklch(70% 0.014 70)"/>
+  </g>
+</svg>

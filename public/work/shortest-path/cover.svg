@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" role="img" aria-label="A small road network drawn as dots and lines. Three source dots on the left and three target dots on the right are joined by highlighted routes.">
+  <rect width="1200" height="750" fill="oklch(92.5% 0.015 75)"/>
+  <g stroke="oklch(80% 0.014 70)" stroke-width="5" stroke-linecap="round" fill="none">
+    <path d="M150 190 L330 120 L520 200 L700 120 L890 210 L1050 150"/>
+    <path d="M150 190 L260 340 L330 120"/>
+    <path d="M260 340 L440 400 L520 200"/>
+    <path d="M440 400 L620 360 L700 120"/>
+    <path d="M620 360 L790 420 L890 210"/>
+    <path d="M150 560 L260 340"/>
+    <path d="M150 560 L350 610 L440 400"/>
+    <path d="M350 610 L560 600 L620 360"/>
+    <path d="M560 600 L760 620 L790 420"/>
+    <path d="M790 420 L980 380 L1050 150"/>
+    <path d="M760 620 L1000 590 L980 380"/>
+    <path d="M890 210 L980 380"/>
+  </g>
+  <g stroke="oklch(63% 0.15 33)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M150 190 L260 340 L440 400 L620 360 L790 420 L980 380"/>
+    <path d="M150 560 L350 610 L560 600 L760 620 L1000 590"/>
+    <path d="M150 190 L330 120 L520 200 L700 120 L890 210 L1050 150"/>
+  </g>
+  <g fill="oklch(98.5% 0.004 75)" stroke="oklch(52% 0.012 62)" stroke-width="4">
+    <circle cx="330" cy="120" r="12"/><circle cx="520" cy="200" r="12"/><circle cx="700" cy="120" r="12"/>
+    <circle cx="260" cy="340" r="12"/><circle cx="440" cy="400" r="12"/><circle cx="620" cy="360" r="12"/>
+    <circle cx="790" cy="420" r="12"/><circle cx="350" cy="610" r="12"/><circle cx="560" cy="600" r="12"/>
+    <circle cx="760" cy="620" r="12"/><circle cx="890" cy="210" r="12"/>
+  </g>
+  <g fill="oklch(42% 0.12 33)">
+    <circle cx="150" cy="190" r="26"/><circle cx="150" cy="560" r="26"/>
+  </g>
+  <g fill="oklch(98.5% 0.004 75)" stroke="oklch(42% 0.12 33)" stroke-width="8">
+    <circle cx="1050" cy="150" r="24"/><circle cx="980" cy="380" r="24"/><circle cx="1000" cy="590" r="24"/>
+  </g>
+</svg>

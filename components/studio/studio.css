@@ -1,0 +1,23 @@
+/* Hallmark · the studio's static fallback and the contrast fix for cream text on the accent. Tokens only. */
+
+.studio-fallback { position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; }
+.studio-fallback__room { width: 100%; height: 100%; object-fit: contain; padding: var(--space-md); }
+@media (min-width: 60rem) {
+  /* the room sits right and the headline left, the same as the 3D camera */
+  .studio-fallback { justify-items: end; }
+  .studio-fallback__room { width: 58%; padding: 4.5rem var(--gutter) var(--space-lg) 0; }
+}
+.studio-fallback__booth {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  background: var(--color-paper);
+}
+.studio-fallback__card {
+  max-width: 86vw; max-height: 74svh; aspect-ratio: 900 / 1330;
+  box-shadow: 0 1.2rem 2.4rem color-mix(in oklab, var(--color-ink) 28%, transparent);
+  animation: studio-card-in var(--dur-long) var(--ease-out) both;
+}
+@keyframes studio-card-in { from { opacity: 0; transform: translateY(1.5rem); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .studio-fallback__card { animation: studio-card-in 150ms linear both; }
+  @keyframes studio-card-in { from { opacity: 0; } to { opacity: 1; } }
+}
