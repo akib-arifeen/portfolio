@@ -5,7 +5,7 @@ const work: Work = {
   title: "LoopCraft",
   kicker: "Personal project · 2026",
   summary:
-    "A multi-track looper in the browser. One tap plays a synthesized demo with no microphone, and you can then edit the beat, record loops, mix with real effects and export a WAV, all on a sample-accurate Web Audio engine.",
+    "A multi-track looper in the browser. One tap plays a synthesized demo with no microphone, a theory-aware chord lane keeps everything in key, and you can record, mix with real effects and export a WAV on a sample-accurate Web Audio engine.",
   role: "Rebuilt the audio engine, the interface and the test suite",
   when: "Prototype June 2025, rebuilt October 2026",
   stack: ["Next.js 16", "React 19", "TypeScript", "Web Audio API", "AudioWorklet", "OfflineAudioContext", "CSS Modules"],
@@ -91,9 +91,17 @@ const work: Work = {
         { value: "0 samples", label: "of drift", note: "three runs of 24 to 26 loops, each exactly 118,762 frames, under buffer swaps, an agent command, a drive sweep and two 1.5 s main-thread freezes" },
         { value: "0.8 to 1.3 s", label: "from the click to sound, no microphone", note: "production build, headless Chromium, repeat runs" },
         { value: "exact", label: "WAV frame count and a seamless wrap", note: "matches an independent Python reference; the last pass differs from the first by at most 436 of 32768, against 26871 for a one-sample shift" },
-        { value: "159", label: "Node tests", note: "a type-checked build and 0 axe violations; mutation testing killed 28 of 31 planted bugs and added tests now kill the other 3" },
+        { value: "260", label: "Node tests", note: "a type-checked build and 0 axe violations; mutation testing killed 28 of 31 planted bugs and added tests now kill the other 3" },
         { value: "iframe", label: "works across origins", note: "with allow=\"autoplay; microphone\"; if the mic is denied it falls back to the pads" },
         { value: "10.4 s", label: "silence bug fixed", note: "the demo used to go quiet after 10.4 s in Chromium until loop lengths were chosen to survive a floating point round trip" },
+      ],
+    },
+    {
+      kind: "prose",
+      heading: "A chord lane that knows the key",
+      paras: [
+        "The harmony layer builds the diatonic chords of the project key, realises them with voice leading, and suggests progressions that stay in key. Someone who knows theory sees the chords they expect; a beginner cannot pick a wrong note by accident.",
+        "The chord lane reads and writes the same pattern model as the drum grid, so a shared link carries both.",
       ],
     },
     {

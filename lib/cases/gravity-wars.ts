@@ -5,16 +5,16 @@ const work: Work = {
   title: "Gravity Wars",
   kicker: "Personal project · 2026",
   summary:
-    "A browser gravity brawler. You eat debris, absorb smaller rivals and use the stars without falling into them, against bots on three difficulty levels, entirely offline.",
+    "A browser gravity brawler. Endless is the default: eat debris, absorb smaller rivals, slingshot around stars and climb a live top ten while bots of varied skill drop in and out. Entirely offline.",
   role: "Rebuilt the game: simulation, bots, rendering, sound, controls and tests",
   when: "Rebuilt October 2026",
   stack: ["TypeScript", "Canvas 2D", "Web Audio", "React 19", "Next.js 15.5 static export", "Vitest"],
   status: "shipped",
-  outcome: { value: "60 of 60 seeded runs match a Python reference", note: "the simulation agrees with an independent Python implementation, in plain TypeScript against a second one in Python" },
+  outcome: { value: "534 tests", note: "60 of 60 seeded runs match an independent Python reference; 5 arenas and 23 achievements" },
   links: [
     { label: "Play it live", href: "https://gravity-warsio.vercel.app" },
     { label: "Source on GitHub", href: "https://github.com/akib-arifeen/gravity-wars.io" },
-    { label: "Merged pull request", href: "https://github.com/akib-arifeen/gravity-wars.io/pull/1" },
+    { label: "Phase A pull request", href: "https://github.com/akib-arifeen/gravity-wars.io/pull/3" },
   ],
   cover: {
     kind: "image",
@@ -29,8 +29,8 @@ const work: Work = {
       kind: "prose",
       heading: "A game where the physics has to be right",
       paras: [
-        "You pick Easy, Normal or Hard, which gives you 3, 5 or 7 bot rivals, and then play a round to a win or a loss. A live round runs behind the menu.",
-        "You win by reaching critical mass of 130, by being the last body standing, or by being heaviest when the clock runs out.",
+        "Endless is the default. The arena never ends, you respawn, bots of varied skill drop in and out, mass decays above 80, and a live top ten puts a crown on the leader. The original timed round is still there, with Easy, Normal or Hard and 3, 5 or 7 rivals.",
+        "You grow by eating debris and absorbing smaller bodies. Dash, repulse and a singularity ultimate turn gravity into a weapon, and a clean slingshot around a star releases a speed burst.",
         "I wrote the simulation in plain TypeScript with no React and no DOM in it, and the game has no runtime dependencies beyond Next.js and React.",
       ],
     },
@@ -61,6 +61,15 @@ const work: Work = {
       caption:
         "The player and every bot go through the same small input, an Intent. That keeps the engine ignorant of who is steering a body. Multiplayer is not built: the game is offline-first, and this is the seam where remote players would plug in later.",
       source: "gravity-wars · game/types.ts",
+    },
+    {
+      kind: "steps",
+      heading: "What Phase A adds",
+      items: [
+        { title: "Gravity as a weapon", body: "Dash to escape or lunge, repulse to shove a rival into a star, and a singularity ultimate that turns you into a temporary black hole. A clean slingshot releases a speed burst." },
+        { title: "A living arena", body: "Six announced cosmic events, from meteor showers to a pulsar beam, across five arenas: Classic, Binary, The Maw, Nebula Field and The Belt." },
+        { title: "A reason to come back", body: "23 achievements, lifetime stats and an in-arena top ten. All of it runs offline; the leaderboard is local because there is no server." },
+      ],
     },
     {
       kind: "steps",
@@ -98,7 +107,7 @@ const work: Work = {
       items: [
         { value: "60 fps", label: "on Hard at DPR 2", note: "1600 by 1000, 8 bodies and about 430 debris pieces, no frame slower than 20 ms across 2 x 600 frames" },
         { value: "0.3 ms", label: "average simulation step", note: "average render time 0.4 ms, headless Chrome on an M-series Mac under heavy load" },
-        { value: "206", label: "automated tests", note: "mutation testing killed 36 of 44 planted bugs" },
+        { value: "534", label: "automated tests", note: "Phase A added 328; mutation testing killed 36 of 44 planted bugs" },
         { value: "60 of 60", label: "seeded runs match a Python reference", note: "the engine's integration against an independent Python reference" },
         { value: "0 of 1200", label: "frames slower than 20 ms", note: "60 fps on Hard at DPR 2, with a physics step of about 0.3 ms" },
         { value: "800 by 520", label: "cross-origin iframe", note: "works with no allow attribute" },
@@ -108,7 +117,7 @@ const work: Work = {
       kind: "prose",
       heading: "What is still open",
       paras: [
-        "On Easy, a player who gives no input for about 30 to 50 s tends to drift into a gravity well, and Easy bots reverse heading often.",
+        "The leaderboard is local because the game has no server; a global board and multiplayer are Phase C. The original timed round is kept alongside Endless for players who want a finish line.",
       ],
     },
   ],
