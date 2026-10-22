@@ -280,6 +280,7 @@ const LIVE: Record<string, string> = {
   LoopCraft: "https://loop-craft-six.vercel.app",
   "Gravity Wars": "https://gravity-warsio.vercel.app",
   "L\u00e9yci storefront": "https://leyci.pages.dev",
+  "Twinkle Star": "https://twinkle-star-liart.vercel.app",
 };
 const file = (p: string) => resolvePath(p) as FsFile | null;
 
