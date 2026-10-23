@@ -38,6 +38,7 @@ const work: Work = {
       paras: [
         "The onboarding turned out to be the part that matters. People will not read a course that assumes a setup they do not have, so a one-minute onboarding asks for role, coding experience, goal, AI tool, computer and time a week, one question per step, and the rest of the course rearranges itself around the answers.",
         "The pro track came later and turned out to be the part I am proudest of. It follows how professionals actually work with an agent: plan first, keep a rules file, plug in tools over MCP, add skills and hooks, delegate to cheap subagents, prove the work, run a lead with workers, run sessions in parallel and in CI, and ship safely.",
+        "The last pass before production calmed the guide and the pro pages down to one idea per screen. Every quest now carries the official documentation for the apps it mentions, deduped by URL and labelled when a reference is community maintained, and six concept diagrams (loop, brief, context, MCP, delegate, team) draw themselves once on scroll and sit still when the system asks for reduced motion.",
       ],
     },
     {
@@ -103,7 +104,8 @@ const work: Work = {
       kind: "facts",
       heading: "Evidence",
       items: [
-        { value: "390", label: "unit tests passing", note: "the whole suite, including a sweep of every quest by variant by tool by OS for empty slots" },
+        { value: "422", label: "tests passing", note: "the whole suite, including a sweep of every quest by variant by tool by OS for empty slots" },
+        { value: "Live", label: "in production", note: "the landing page, the guide and the nine-level pro track; the MCP endpoint rejects requests without a token" },
         { value: "19 of 24", label: "planted bugs caught by mutation testing", note: "in the onboarding release; tests were then added for the main survivors" },
         { value: "375px", label: "width checked with axe-core", note: "WCAG 2.1 A and AA scan passes on every screen and sheet, no horizontal scroll" },
         { value: "11", label: "AI coding tools supported", note: "every fact linked to official docs, checked 22 Oct 2026" },

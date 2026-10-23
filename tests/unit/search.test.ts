@@ -226,6 +226,7 @@ const FOLDER_SLUG: Record<string, string> = {
   "Léyci storefront": "leyci",
   "Shortest-path engine": "shortest-path",
   "Twinkle Star": "twinkle-star",
+  "Save Your Princess": "save-your-princess",
 };
 
 describe("buildIndex: shape", () => {

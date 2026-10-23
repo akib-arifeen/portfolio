@@ -12,6 +12,7 @@ import workoutPlanner from "./cases/workout-planner";
 import culinaryCompanion from "./cases/culinary-companion";
 import shortestPath from "./cases/shortest-path";
 import twinkleStar from "./cases/twinkle-star";
+import saveYourPrincess from "./cases/save-your-princess";
 
 export const works: Work[] = [
   videoStudio,
@@ -26,4 +27,5 @@ export const works: Work[] = [
   culinaryCompanion,
   shortestPath,
   twinkleStar,
+  saveYourPrincess,
 ];

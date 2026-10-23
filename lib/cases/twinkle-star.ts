@@ -79,7 +79,7 @@ const work: Work = {
     },
     {
       kind: "decisions",
-      heading: "Decisions I would defend",
+      heading: "The calls I would defend",
       items: [
         {
           choice: "Local first, no server",
@@ -106,6 +106,14 @@ const work: Work = {
         { value: "2,384", label: "time-zone offsets checked", note: "plus 1,456 wall-clock conversions from Python zoneinfo, 2025 to 2028" },
         { value: "3 s", label: "for a signal to cross two tabs", note: "each tab kept its own signed-in person; same-second messages were both kept" },
         { value: "0", label: "third-party scripts", note: "CanvasKit and the app fonts are bundled; the engine fetches Roboto and, when needed, Noto" },
+      ],
+    },
+    {
+      kind: "prose",
+      heading: "Where it stands",
+      paras: [
+        "This is the web build of the app, deployed and public at the link above. Everything runs in the tab: there is no server and no account, and the journal never leaves the device.",
+        "The demo pairs two tabs on one device, because the pairing flow has no cloud to go through. The widget tests run every flow at 390 and 360 pixels wide, and the time-zone rules are checked against real tzdata, but the full two-tab journey is something you should try yourself.",
       ],
     },
   ],

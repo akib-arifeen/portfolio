@@ -273,6 +273,7 @@ const FOLDER_SLUG: Record<string, string> = {
   "L\u00e9yci storefront": "leyci",
   "Shortest-path engine": "shortest-path",
   "Twinkle Star": "twinkle-star",
+  "Save Your Princess": "save-your-princess",
 };
 const LIVE: Record<string, string> = {
   "Culinary Companion": "https://culnary-companion-bhy9.vercel.app",
@@ -281,13 +282,14 @@ const LIVE: Record<string, string> = {
   "Gravity Wars": "https://gravity-warsio.vercel.app",
   "L\u00e9yci storefront": "https://leyci.pages.dev",
   "Twinkle Star": "https://twinkle-star-liart.vercel.app",
+  "Save Your Princess": "https://syp-playtest.vercel.app/?mend=1",
 };
 const file = (p: string) => resolvePath(p) as FsFile | null;
 
 describe("Projects folder", () => {
   const names = () => (listDir("/Users/akib/Projects") as FsNode[]).map((n) => n.name);
 
-  it("has exactly the twelve project folders", () => {
+  it("has exactly the thirteen project folders", () => {
     expect([...names()].sort()).toEqual(Object.keys(FOLDER_SLUG).sort());
     for (const n of listDir("/Users/akib/Projects") as FsNode[]) expect(n.kind).toBe("folder");
   });

@@ -14,6 +14,7 @@ const fromPlay = (slug: string): Tile => {
 const tiles: Tile[] = [
   fromPlay("gravity-wars"),
   fromPlay("loopcraft"),
+  fromPlay("save-your-princess"),
   { key: "booth", name: "The photobooth", blurb: "Walk up to the booth in the studio, take a photo and get a printed card.", status: "playable", href: "/#booth" },
   { key: "laptop", name: "My laptop", blurb: "Open it and look around: Files, Notes, Photos, Music and a Terminal.", status: "playable", href: "/#laptop" },
 ];

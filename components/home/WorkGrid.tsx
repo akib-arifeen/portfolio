@@ -55,8 +55,12 @@ function Card({ work, large }: { work: Work; large: boolean }) {
   );
 }
 
+// The two statuses that mean the thing is live and usable. The rest (prototypes, in progress, concepts) are
+// listed on /work so the home grid never mixes "you can open this" with "this is being built".
+const LIVE: Work["status"][] = ["shipped", "in production"];
+
 export default function WorkGrid() {
-  const works = allWorks().slice(0, 8); // "All work" carries the rest
+  const works = allWorks().filter((w) => LIVE.includes(w.status)); // "All work" carries the rest
   return (
     <ol className="hgrid">
       {works.map((w, i) => <Card key={w.slug} work={w} large={i < 2} />)}

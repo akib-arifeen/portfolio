@@ -1,5 +1,5 @@
 // Playground items: games and experiments that run inside the laptop. Worker-owned data.
-// url/embeddable verified 2026-10-22 with `curl -sIL`: no X-Frame-Options or frame-ancestors on any of the four live sites.
+// url/embeddable verified 2026-10-23 with `curl -sIL`: no X-Frame-Options or frame-ancestors on the live sites. Twinkle is live but opens in its own tab because its pairing demo needs two tabs.
 import type { PlayItem } from "./types";
 
 export const playItems: PlayItem[] = [
@@ -43,10 +43,21 @@ export const playItems: PlayItem[] = [
     workSlug: "agent-quest",
   },
   {
+    slug: "save-your-princess",
+    name: "Save Your Princess",
+    blurb: "The MEND room from a 3D narrative game in development: find three shards, fit them into a leaded window and open the door.",
+    status: "beta",
+    url: "https://syp-playtest.vercel.app/?mend=1",
+    embeddable: true,
+    allow: "fullscreen",
+    workSlug: "save-your-princess",
+  },
+  {
     slug: "twinkle-star",
     name: "Twinkle Star",
-    blurb: "A Flutter build of a UX design by a CityU SM2609 team. I built the app.",
-    status: "rebuilding",
+    blurb: "A Flutter build of a UX design by a CityU SM2609 team. I built the app. Open it in its own tab and pair two tabs on one device.",
+    status: "beta",
+    url: "https://twinkle-star-liart.vercel.app",
     embeddable: false,
     workSlug: "twinkle-star",
   },
