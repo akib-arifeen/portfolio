@@ -5,8 +5,8 @@ const work: Work = {
     title: "AI photobooth with ARI",
     kicker: "See Change Education \u00b7 2026",
     summary:
-      "A photobooth hosted by ARI, an animated character who greets guests, talks with them in English or Cantonese, restyles their photo with AI and prints it on the spot.",
-    role: "Concept, UX, animation, voicelines, prompts, frontend, backend and the print agent",
+      "I built a photobooth hosted by ARI, an animated character who greets guests, talks with them in English or Cantonese, restyles their photo with AI and prints it on the spot.",
+    role: "I did the concept, the UX, the animation, the voicelines, the prompts, the frontend, the backend and the print agent",
     when: "2026",
     stack: ["React", "Spring Boot", "FastAPI", "Azure Speech", "MiniMax TTS", "Node.js print agent"],
     status: "shipped",
@@ -23,11 +23,18 @@ const work: Work = {
     blocks: [
       {
         kind: "prose",
-        heading: "The ask and what it became",
+        heading: "What I wanted to build",
         paras: [
-          "The ask was a photobooth. I turned it into a character-led experience: ARI greets you as you walk up, talks back in English or Cantonese, tells fun facts while you wait and prints silently.",
-          "I wrote the voicelines, designed the animations and built a native print agent, because browsers cannot print silently.",
-          "It ran live at SCMUN 2026 and at the AAI dinner, where most guests spoke Cantonese.",
+          "The ask was a photobooth. What I wanted was for the thing to talk to people, so I turned it into a character-led experience: ARI greets you as you walk up, talks back in English or Cantonese, tells fun facts while you wait and prints silently.",
+          "I wrote the voicelines, designed the animations and built a native print agent, because browsers cannot print silently. It ran live at SCMUN 2026 and at the AAI dinner, where most guests spoke Cantonese.",
+        ],
+      },
+      {
+        kind: "prose",
+        heading: "What actually happened",
+        paras: [
+          "The booth became a host rather than a camera. Guests remember being greeted and talked to, so ARI speaks to them in their own language, and the voicelines are mine, written in English and Cantonese.",
+          "Most of the room spoke Cantonese, which meant ARI had to speak Cantonese well rather than just English well, and that set the tone for the whole build. The audio and the animation are one thing here, not two: the character has to keep talking while the photo is being restyled, otherwise the wait feels like a stall.",
         ],
       },
       {
@@ -124,7 +131,7 @@ def key_to_alpha(img: np.ndarray, key_hue: float, tol: float = 0.06) -> np.ndarr
       },
       {
         kind: "decisions",
-        heading: "Decisions I would defend",
+        heading: "The calls I would defend",
         items: [
           {
             choice: "A character, not just a camera",
@@ -141,6 +148,30 @@ def key_to_alpha(img: np.ndarray, key_hue: float, tol: float = 0.06) -> np.ndarr
             why: "Preloading every clip hit the browser's media player cap, so most of the voice pack could not play.",
             cost: "A few milliseconds on the first play of a line, with a short hot set warmed ahead for the attract screen.",
           },
+        ],
+      },
+      {
+        kind: "prose",
+        heading: "What broke",
+        paras: [
+          "The voice bank broke at the worst possible moment. I was creating an audio element for every clip up front, and browsers cap how many media players a page can hold, so lines late in a long list simply never played. Creating the elements lazily with preload none and warming only a short list fixed it. The cost was a few milliseconds on the first play of a line, with a short hot set warmed ahead for the attract screen.",
+          "Printing broke in a way that was not my code's fault at all. A browser cannot print silently, so a print dialog would have appeared in front of a guest at an event and broken the whole flow. There was no way around that except to write my own program that runs on the booth laptop.",
+        ],
+      },
+      {
+        kind: "prose",
+        heading: "What I learned",
+        paras: [
+          "A voice-first interface has to prove it is listening. The loudest status element on the screen is the heard strip, showing the live mic state and the last thing the app heard, because a guest who cannot tell whether the booth heard them will talk louder and then give up.",
+          "Some of the hardest parts of this project were not about AI at all. They were about a browser refusing to print quietly and a page refusing to hold one more audio element. I had to treat those as product problems rather than platform problems, because at an event there is nobody to ask.",
+        ],
+      },
+      {
+        kind: "prose",
+        heading: "What I would do differently",
+        paras: [
+          "I would write the print agent first. It was the piece I knew could not be done in the browser, and I built it late, which meant the card layout and the print flow had to bend around it instead of the other way round.",
+          "I would also load the voice pack lazily from the start rather than after an event taught me to. The fix is small now, but it cost me a run to find.",
         ],
       },
       {

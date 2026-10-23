@@ -5,8 +5,8 @@ const work: Work = {
   title: "Zoom recording automation",
   kicker: "See Change Education · 2026",
   summary:
-    "A nightly job that backs up every class recording from Zoom to S3, matches it to the right lesson, proposes attendance and frees Zoom storage, with an alert at the end of the day for classes with no recording.",
-  role: "Backup, matching, attendance, storage clean-up, the alerts and the job lock",
+    "I built a nightly job that backs up every class recording from Zoom to S3, matches it to the right lesson, proposes attendance and frees Zoom storage, with an alert at the end of the day for classes with no recording.",
+  role: "I built the backup, the matching, the attendance, the storage clean-up, the alerts and the job lock",
   when: "2026",
   stack: ["Spring Boot", "Zoom API", "AWS S3", "Redis", "MySQL", "Flyway", "React"],
   status: "in production",
@@ -22,9 +22,16 @@ const work: Work = {
   blocks: [
     {
       kind: "prose",
-      heading: "The ask and what it became",
+      heading: "What I wanted to build",
       paras: [
-        "The ask was to save the Zoom recordings. I turned it into a system: every class recording is backed up to S3, linked to its lesson, and Zoom storage is freed, with attendance and an alert for anything missing.",
+        "The ask was to save the Zoom recordings. That is all it was, one line. What I built from it is a system: every class recording is backed up to S3, linked to its lesson, and Zoom storage is freed, with attendance and an alert for anything missing.",
+        "The reason I did not stop at a download script is that a backup nobody trusts is not a backup. It has to say what it did, say what it could not do, and never quietly lose a class.",
+      ],
+    },
+    {
+      kind: "prose",
+      heading: "What actually happened",
+      paras: [
         "Deleting from Zoom is the scary part, so the clean-up shows a preview first. One recording that always fails backs off instead of blocking the queue, and a recording that runs out of retries lands in a visible needs-attention state instead of vanishing.",
         "I measured the live Zoom account instead of trusting the documentation. I had assumed attendance reports expire after 30 days, and Zoom answered for reports 31 days, 142 days and about 12 months old. Attendance is only proposed from those reports, never written without a person.",
       ],
@@ -77,7 +84,7 @@ boolean keepLock(String key, String token, long ttlMs) {
     },
     {
       kind: "decisions",
-      heading: "Decisions I would defend",
+      heading: "The calls I would defend",
       items: [
         {
           choice: "Write a small lock instead of adding ShedLock",
@@ -99,6 +106,30 @@ boolean keepLock(String key, String token, long ttlMs) {
           why: "Students have no participant id, so the display name is the identity, and a missing report is not an empty class. A person confirms.",
           cost: "A human confirmation step, in exchange for never writing a wrong attendance record.",
         },
+      ],
+    },
+    {
+      kind: "prose",
+      heading: "What broke",
+      paras: [
+        "A single Redis timeout aborted a whole nightly sweep mid-download. The lock could only say yes or no, so a question that never reached Redis looked exactly like a lock somebody else had taken, and the job gave up on classes it could have finished.",
+        "The other failure was quieter. A recording that ran out of retries used to vanish, which is the worst way to lose a class: nothing errored, the list just got shorter. It now lands in a visible needs-attention state, and one bad recording no longer holds up the rest of the queue.",
+      ],
+    },
+    {
+      kind: "prose",
+      heading: "What I learned",
+      paras: [
+        "To measure the live account instead of trusting the documentation. I had assumed the attendance reports expire much sooner than they do, and the real answer was far more generous. Every number I quote about how far back I can go came from asking Zoom, not from reading.",
+        "To separate a question that was not answered from an answer that was no. That distinction is the whole reason the lock has three outcomes instead of two, and it is why a flaky network no longer costs me a night of backups.",
+      ],
+    },
+    {
+      kind: "prose",
+      heading: "What I would do differently",
+      paras: [
+        "I would build the needs-attention state first. It is the part that protects the data, and I built it late, after a recording had already gone missing quietly.",
+        "I would also have fixed the existing lock helper instead of writing my own. It had a fixed 5-minute expiry and no owner token, and I would rather have spent the effort making it work for this case than own a second lock forever.",
       ],
     },
     {
