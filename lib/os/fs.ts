@@ -137,12 +137,12 @@ const PROJECTS: Project[] = [
   },
   {
     folder: "Save Your Princess", slug: "save-your-princess",
-    line: "A 3D narrative game about mending a broken window in a dream castle.",
+    line: "A 3D narrative game about mending broken glass in a dream castle.",
     role: "Story shape, the MEND mechanic, the room kit and the code",
     stack: "TypeScript, Babylon.js 9, Vite, WebGPU",
-    status: "Playable slice, in development",
-    outcome: "The MEND room: three shards, a leaded window and a door that opens",
-    live: "https://syp-playtest.vercel.app/?mend=1",
+    status: "Playable vertical slice, in development",
+    outcome: "Two rooms and an ending: mending, light and her pink shard",
+    live: "https://syp-playtest.vercel.app/?slice=1",
   },
 ];
 

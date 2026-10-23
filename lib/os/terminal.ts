@@ -136,7 +136,7 @@ export function runCommand(input: string, ctx: TermCtx): TermResult {
       return done([
         { text: "Growing SeeChange Studio, the AI video platform I built at See Change Education." },
         { text: "Offering the photobooth to schools, and finishing my computer science degree at CityUHK." },
-        { text: "Shipped the rebuilt LoopCraft and Gravity Wars, both playable in the browser." },
+        { text: "Shipped the rebuilt LoopCraft and Gravity Wars, both playable in the browser, and a Save Your Princess slice." },
       ]);
     case "projects":
       return done(projectsLines());

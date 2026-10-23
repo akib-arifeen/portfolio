@@ -45,9 +45,9 @@ export const playItems: PlayItem[] = [
   {
     slug: "save-your-princess",
     name: "Save Your Princess",
-    blurb: "The MEND room from a 3D narrative game in development: find three shards, fit them into a leaded window and open the door.",
+    blurb: "A 3D narrative game in development. This slice: mend broken windows in a dream castle and watch the light answer you.",
     status: "beta",
-    url: "https://syp-playtest.vercel.app/?mend=1",
+    url: "https://syp-playtest.vercel.app/?slice=1",
     embeddable: true,
     allow: "fullscreen",
     workSlug: "save-your-princess",

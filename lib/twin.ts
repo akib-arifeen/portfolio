@@ -277,6 +277,15 @@ export const entries: TwinEntry[] = [
     action: readCase("twinkle-star"),
   },
   {
+    id: "save-your-princess",
+    questions: ["What is Save Your Princess?", "Tell me about the mending game", "Is Save Your Princess playable"],
+    keywords: ["save", "princess", "mend", "mending", "castle", "shard", "shards", "window", "narrative", "babylon"],
+    answer: "Save Your Princess is a 3D narrative game in the browser, and the playable slice is the MEND chamber: a hooded figure finds three shards and fits them into a broken leaded window, with no timer and no fail state. I built the story shape, the mechanic, the rooms and the code in Babylon.js. It is a vertical slice, not the finished game, and the page says exactly what is still being built.",
+    sources: ["lib/cases/save-your-princess.ts", "SYP playtest build mend-v1-2026-10-24"],
+    followUps: ["gravity-wars", "design", "twinkle-star"],
+    action: readCase("save-your-princess"),
+  },
+  {
     id: "fyp",
     questions: ["What is your final year project?", "Tell me about your FYP", "What is the shortest-path engine"],
     keywords: ["fyp", "thesis", "cpp", "openmp", "cmake", "dimacs", "graph", "graphs", "road", "routing", "travel", "algorithms", "research"],

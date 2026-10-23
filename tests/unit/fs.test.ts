@@ -282,7 +282,7 @@ const LIVE: Record<string, string> = {
   "Gravity Wars": "https://gravity-warsio.vercel.app",
   "L\u00e9yci storefront": "https://leyci.pages.dev",
   "Twinkle Star": "https://twinkle-star-liart.vercel.app",
-  "Save Your Princess": "https://syp-playtest.vercel.app/?mend=1",
+  "Save Your Princess": "https://syp-playtest.vercel.app/?slice=1",
 };
 const file = (p: string) => resolvePath(p) as FsFile | null;
 
