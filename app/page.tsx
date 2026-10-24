@@ -37,6 +37,7 @@ export default function Page() {
           <WorkGrid />
           <p className="section__more">
             <Link className="more" href="/work">All work <span aria-hidden="true">&rarr;</span></Link>
+            <Link className="more" href="/writing">Writing <span aria-hidden="true">&rarr;</span></Link>
           </p>
         </div>
       </section>
