@@ -1,7 +1,7 @@
 /* Work index, case studies and /play. Tokens only: no raw colours. */
 
 .work { padding-block: var(--space-lg) var(--space-3xl); }
-.work__nav { padding-block: var(--space-md) var(--space-xl); }
+.work__nav { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm) var(--space-md); padding-block: var(--space-md) var(--space-xl); }
 .back { display: inline-flex; align-items: center; min-height: 2.75rem; font-size: var(--text-sm); color: var(--color-ink-2); text-underline-offset: 0.25em; }
 .back::before { content: "\2190"; margin-right: var(--space-xs); }
 @media (hover: hover) { .back:hover { color: var(--color-accent); } }
@@ -45,6 +45,8 @@
 }
 @media (min-width: 60rem) {
   .wlist:not(.wlist--grid) .wcard__link { grid-template-columns: 1.1fr 1fr; gap: var(--space-xl); align-items: center; }
+  /* Essay cards carry no cover: one column, so the body never shares the row with an empty track. */
+  .wlist--essays:not(.wlist--grid) .wcard__link { grid-template-columns: 1fr; }
 }
 
 /* media */
