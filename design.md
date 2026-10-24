@@ -76,15 +76,17 @@ Scale: major third on a 16px base.
 --text-sm      0.8125rem   labels, captions, kickers
 --text-base    1rem        body
 --text-md      1.25rem     lead paragraphs, card summaries
---text-lg      1.5625rem   section titles
---text-xl      1.9531rem   page titles
---text-display clamp(2.6rem, 2.2vw + 1.7rem, 4.6rem)   home hero only
+--text-lg      1.5625rem   grouped section labels
+--text-xl      1.9531rem   section and card titles
+--text-display clamp(2.6rem, 2.2vw + 1.7rem, 4.6rem)   page titles: hero and content pages
 ```
 
 - Display line-height `1.04`; body `1.6`.
-- Kickers are uppercase Geist Mono at `--text-sm` with letter-spacing, colour `--color-muted`.
-- `--text-display` belongs to the home hero. Content page `h1`s use `--text-xl`. Do not scale a
-  section heading up to fill a gap; let the gutter do that work.
+- Kickers are `--text-sm` in Geist with `0.04em` letter-spacing, colour `--color-muted`. They are
+  set in sentence case, not shouted in caps or mono.
+- `--text-display` is the page title size, on the home hero and on a content page's `h1` alike;
+  it clamps, so a 320px screen gets 2.6rem rather than 4.6rem. Section headings step down to
+  `--text-xl`. Do not scale a section heading up to fill a gap; let the gutter do that work.
 
 ## 4. Space, radius, rules
 

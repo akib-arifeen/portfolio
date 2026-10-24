@@ -1,0 +1,50 @@
+/* Projects catalog. Tokens only. Shared primitives (kicker, badge, chip, links) come from
+   globals.css and work.css; everything here is specific to the catalog. */
+
+.projects { padding-block: var(--space-lg) var(--space-3xl); }
+
+.projects__head { display: grid; gap: var(--space-md); margin-bottom: var(--space-xl); }
+.projects__h1 { font-size: var(--text-display); }
+.projects__lede { max-width: 56ch; color: var(--color-ink-2); font-size: var(--text-md); }
+
+/* Filters are links to a URL, so they work with no JavaScript and can be shared. */
+.projects__filters { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-bottom: var(--space-2xl); }
+.projects__filters .chip { min-height: 2.75rem; }
+.projects__filters .chip[aria-current="page"] {
+  background: var(--color-ink);
+  border-color: var(--color-ink);
+  color: var(--color-paper);
+}
+
+.projects__group { display: grid; gap: var(--space-lg); margin-bottom: var(--space-3xl); }
+.projects__group-head { display: grid; gap: var(--space-2xs); }
+.projects__title { font-size: var(--text-xl); }
+.projects__blurb { color: var(--color-muted); font-size: var(--text-sm); max-width: 52ch; }
+
+.pgrid { display: grid; gap: var(--space-md); grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); list-style: none; margin: 0; padding: 0; }
+
+.pcard {
+  display: grid;
+  gap: var(--space-sm);
+  align-content: start;
+  padding: var(--space-lg);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+}
+.pcard__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-md); }
+.pcard__name { font-size: var(--text-md); }
+/* The status words are longer than most titles allow, so the pill keeps its width. */
+.pcard__head .badge { flex: none; }
+.pcard__line { color: var(--color-ink-2); }
+.pcard__links { margin-top: auto; padding-top: var(--space-xs); }
+.pcard__links .chip { min-height: 2.75rem; }
+
+@media (hover: hover) and (pointer: fine) {
+  .pcard { transition: border-color var(--dur-micro) var(--ease-out), background-color var(--dur-micro) var(--ease-out); }
+  .pcard:hover { border-color: var(--color-rule); background: var(--color-paper-3); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .projects *, .pcard { transition-duration: 0.01ms !important; transform: none !important; }
+}
