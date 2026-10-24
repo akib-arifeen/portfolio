@@ -6,6 +6,7 @@ import { contact } from "@/lib/content";
 import { BlogCard } from "@/components/blog/BlogCard";
 import { SiteNav } from "@/components/SiteNav";
 import "../work.css";
+import "../blog.css";
 
 const DESCRIPTION =
   "Case studies and essays about the work: the ask, the decisions I made, the code that mattered and what came of it.";
@@ -21,7 +22,10 @@ const LIVE: Work["status"][] = ["shipped", "in production"];
 export default function BlogIndex() {
   const cases = caseEntries();
   const live = cases.filter((c) => c.status && LIVE.includes(c.status));
-  const rest = cases.filter((c) => !c.status || !LIVE.includes(c.status));
+  // Two stories open the page and the notes come straight after them, so the essays are part of the
+  // feed rather than a tail. Everything else is one catalogue below, shipped first.
+  const featured = live.slice(0, 2);
+  const stories = cases.filter((c) => !featured.includes(c));
   const essays = essayEntries();
 
   return (
@@ -34,31 +38,40 @@ export default function BlogIndex() {
         <p className="work__lede">{DESCRIPTION}</p>
       </header>
 
-      <section className="wgroup" aria-labelledby="live-h">
-        <h2 id="live-h" className="wgroup__title">Shipped and in production</h2>
+      <section className="wgroup" aria-labelledby="selected-h">
+        <h2 id="selected-h" className="wgroup__title">Selected stories</h2>
         <div className="wlist">
-          {live.map((c, i) => (
-            <BlogCard key={c.slug} entry={c} headingLevel={3} featured={i < 2} />
+          {featured.map((c) => (
+            <BlogCard key={c.slug} entry={c} headingLevel={3} featured />
           ))}
         </div>
       </section>
 
-      {rest.length > 0 ? (
-        <section className="wgroup" aria-labelledby="rest-h">
-          <h2 id="rest-h" className="wgroup__title">In progress and concepts</h2>
-          <div className="wlist">
-            {rest.map((c) => (
-              <BlogCard key={c.slug} entry={c} headingLevel={3} />
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      <section className="wgroup" aria-labelledby="essays-h">
-        <h2 id="essays-h" className="wgroup__title">Essays</h2>
-        <div className="wlist wlist--essays">
+      <section className="wgroup" aria-labelledby="notes-h">
+        <div className="wgroup__head">
+          <h2 id="notes-h" className="wgroup__title">Notes and essays</h2>
+          <p className="wgroup__lede">
+            Three shorter pieces from inside the builds: a room with no daylight, a queue waiting for RAM, and
+            the night the booth had to work.
+          </p>
+        </div>
+        <div className="wlist wlist--grid">
           {essays.map((e) => (
             <BlogCard key={e.slug} entry={e} headingLevel={3} />
+          ))}
+        </div>
+      </section>
+
+      <section className="wgroup" aria-labelledby="stories-h">
+        <div className="wgroup__head">
+          <h2 id="stories-h" className="wgroup__title">More project stories</h2>
+          <p className="wgroup__lede">
+            The rest of the catalogue: the work that is live first, then what is still in progress or a concept.
+          </p>
+        </div>
+        <div className="wlist wlist--grid">
+          {stories.map((c) => (
+            <BlogCard key={c.slug} entry={c} headingLevel={3} />
           ))}
         </div>
       </section>
