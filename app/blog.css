@@ -5,6 +5,10 @@
 .wgroup__head { display: grid; gap: var(--space-xs); }
 .wgroup__lede { max-width: 52ch; color: var(--color-ink-2); }
 
+/* The nav floats: an anchor jump would otherwise land the heading at y=0, underneath the pill
+   (16px inset plus a 2.75-3.5rem pill). Every section anchor lands a clear gap below it. */
+.wgroup__title, .cta__title { scroll-margin-top: calc(var(--space-2xl) + var(--space-lg)); }
+
 /* An essay has no screenshot that would mean anything, so it is set as a note: a panel, a dated
    kicker, a ruled top edge in the accent and its own cue. Beside the project cards it reads as
    writing of a different kind instead of one more row in the same list. */
