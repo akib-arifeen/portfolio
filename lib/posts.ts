@@ -55,3 +55,10 @@ export function publishedPosts(): Post[] {
 export function getPost(slug: string): Post | undefined {
   return posts.find((p) => p.slug === slug && !p.draft);
 }
+
+/** "24 October 2026" for headers. UTC so the build output never depends on the server timezone. */
+export function formatPostDate(date: string): string {
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(
+    new Date(`${date}T00:00:00Z`),
+  );
+}

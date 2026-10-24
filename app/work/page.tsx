@@ -21,6 +21,7 @@ export default function WorkIndex() {
     <main className="wrap work">
       <nav className="work__nav" aria-label="Site">
         <Link href="/" className="back">Back to the studio</Link>
+        <Link href="/writing" className="chip">Writing</Link>
       </nav>
       <header className="work__head">
         <p className="kicker">Case studies</p>

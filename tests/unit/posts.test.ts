@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getPost, posts, publishedPosts } from "@/lib/posts";
 import type { Post } from "@/lib/posts";
+import { getWork } from "@/lib/work";
 
 const KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -102,5 +103,26 @@ describe("getPost", () => {
     withPosts([draft], () => {
       expect(getPost("zzz-draft")).toBeUndefined();
     });
+  });
+});
+
+describe("post links", () => {
+  it("points every relatedWork at a published case study", () => {
+    for (const p of published()) {
+      expect(getWork(p.relatedWork), `${p.slug} -> ${p.relatedWork}`).toBeDefined();
+    }
+  });
+
+  it("uses HTTPS for every liveUrl", () => {
+    for (const p of published()) {
+      if (p.liveUrl === undefined) continue;
+      expect(p.liveUrl, p.slug).toMatch(/^https:\/\/\S+$/);
+      expect(() => new URL(p.liveUrl as string), p.slug).not.toThrow();
+    }
+  });
+
+  it("has no public live link on the queue and photo booth essays", () => {
+    expect(getPost("the-queue-that-waits-for-ram")?.liveUrl).toBeUndefined();
+    expect(getPost("when-the-photo-booth-had-to-just-work")?.liveUrl).toBeUndefined();
   });
 });
