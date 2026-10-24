@@ -195,9 +195,9 @@ describe("openAction", () => {
   });
 
   it("site-path links navigate without newTab", () => {
-    const f: FsFile = { ...base, name: "c.webloc", type: "link", href: "/work/leyci" };
+    const f: FsFile = { ...base, name: "c.webloc", type: "link", href: "/blog/leyci" };
     const a = openAction(f, "/p");
-    expect(a).toMatchObject({ type: "href", href: "/work/leyci" });
+    expect(a).toMatchObject({ type: "href", href: "/blog/leyci" });
     expect((a as { newTab?: boolean }).newTab).toBeFalsy();
   });
 
@@ -318,13 +318,13 @@ describe("Projects folder", () => {
     }
   });
 
-  it("'Case study.webloc' exists only for published works and points at /work/<slug>", () => {
+  it("'Case study.webloc' exists only for published works and points at /blog/<slug>", () => {
     for (const [folder, slug] of Object.entries(FOLDER_SLUG)) {
       const f = file(`/Users/akib/Projects/${folder}/Case study.webloc`);
       if (getWork(slug)) {
         expect(f, folder).not.toBeNull();
         expect(f!.type).toBe("link");
-        expect(f!.href).toBe(`/work/${slug}`);
+        expect(f!.href).toBe(`/blog/${slug}`);
       } else {
         expect(f, folder).toBeNull();
       }
@@ -352,7 +352,7 @@ describe("Projects folder", () => {
       newTab: true,
     });
     const cs = file("/Users/akib/Projects/AI photobooth/Case study.webloc")!;
-    expect(openAction(cs, "/x")).toMatchObject({ type: "href", href: "/work/photobooth" });
+    expect(openAction(cs, "/x")).toMatchObject({ type: "href", href: "/blog/photobooth" });
   });
 });
 
@@ -366,7 +366,7 @@ describe("Desktop, Documents, Music, Pictures, Trash", () => {
     expect(openAction(link, "/Users/akib/Desktop/Projects")).toEqual(link.open);
     const all = file("/Users/akib/Desktop/All work.webloc")!;
     expect(all.type).toBe("link");
-    expect(all.href).toBe("/work");
+    expect(all.href).toBe("/blog");
   });
 
   it("the CV pdf points at the public file", () => {

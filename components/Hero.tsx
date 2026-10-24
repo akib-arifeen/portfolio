@@ -1,13 +1,15 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./studio/studio.css";
-import { contact, projects, spotLabels, studioNotes, type StudioSpot } from "@/lib/content";
+import { projects, spotLabels, studioNotes, type StudioSpot } from "@/lib/content";
 import { studioSound } from "@/lib/sound";
 import { phaseForHour, phases, type Phase } from "./studio/palette";
 import BoothExperience from "./booth/BoothExperience";
 import AskAkib, { type AkibState } from "./twin/AskAkib";
+import { SiteNav } from "./SiteNav";
 
 const Studio = dynamic(() => import("./studio/Studio"), { ssr: false });
 const Desk = dynamic(() => import("./desk/Desk"), { ssr: false });
@@ -246,26 +248,12 @@ export default function Hero() {
 
   return (
     <>
-      <header className="nav">
-        <div className="nav__pill">
-          <a className="wordmark" href="#top">
-            <span className="wordmark__full">Akib Arifeen</span>
-            <span className="wordmark__short">Akib</span>
-          </a>
-          <nav className="nav__links" aria-label="Sections">
-            <a className="nav__link" href="/work">Work</a>
-            <a className="nav__link" href="/writing">Writing</a>
-            <a className="nav__link nav__link--sound" href="#sound">Sound</a>
-            <a className="nav__link" href={contact.cv} download>CV</a>
-          </nav>
-          <div className="nav__actions">
-            <button className="chip chip--icon" type="button" aria-pressed={soundOn} onClick={toggleSound}>
-              <SpeakerIcon on={soundOn} />
-              <span className="chip__label">{soundOn ? "Sound on" : "Sound off"}</span>
-            </button>
-          </div>
-        </div>
-      </header>
+      <SiteNav wordmarkHref="#top">
+        <button className="chip chip--icon" type="button" aria-pressed={soundOn} onClick={toggleSound}>
+          <SpeakerIcon on={soundOn} />
+          <span className="chip__label">{soundOn ? "Sound on" : "Sound off"}</span>
+        </button>
+      </SiteNav>
 
       <section className="hero" id="top" aria-label="Studio">
         <div className="wrap hero__grid">
@@ -405,8 +393,8 @@ export default function Hero() {
                       scene, or one from the list.
                     </p>
                     <div className="detail__actions">
-                      <a className="chip" href="/work">All work</a>
-                      <a className="chip" href="/writing">Writing</a>
+                      <Link className="chip" href="/blog">All work</Link>
+                      <Link className="chip" href="/projects">Projects</Link>
                     </div>
                   </div>
                 )}

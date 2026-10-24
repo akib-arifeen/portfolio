@@ -147,7 +147,7 @@ const PROJECTS: Project[] = [
 ];
 
 function projectFolder(p: Project): FsFolder {
-  const links = [`/work/${p.slug}`, p.live, p.repo].filter(Boolean).join(", ");
+  const links = [`/blog/${p.slug}`, p.live, p.repo].filter(Boolean).join(", ");
   const readme = [
     `# ${p.folder}`,
     p.line,
@@ -159,7 +159,7 @@ function projectFolder(p: Project): FsFolder {
     `Links: ${links}`,
   ].join("\n");
   const children: FsNode[] = [text("README.md", readme)];
-  if (getWork(p.slug)) children.push(link("Case study.webloc", `/work/${p.slug}`));
+  if (getWork(p.slug)) children.push(link("Case study.webloc", `/blog/${p.slug}`));
   if (p.live) children.push(link("Open live.webloc", p.live));
   return folder(p.folder, children);
 }
@@ -194,7 +194,7 @@ export const fsRoot: FsFolder = {
         folder("Desktop", [
           cvPdf(),
           link("Projects", "/Users/akib/Projects", { type: "open", app: "files", arg: { path: "/Users/akib/Projects" } }),
-          link("All work.webloc", "/work"),
+          link("All work.webloc", "/blog"),
         ]),
         folder("Documents", [cvPdf(), text("How I work.txt", howNote ? howNote.body.join("\n\n") : "")]),
         folder("Downloads", []),

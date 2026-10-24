@@ -16,7 +16,7 @@ export const calEvents: CalEvent[] = [
     title: "852HealthKare workout module",
     kind: "work",
     note: "Part-time: an AI agent that builds personalised workout plans, guided by voice and animations. The source gives months only (Nov 2025 to Jan 2026), so the dates sit on the 1st.",
-    action: { type: "href", href: "/work/workout-planner" },
+    action: { type: "href", href: "/blog/workout-planner" },
   },
   {
     start: "2026-09-09",
@@ -24,7 +24,7 @@ export const calEvents: CalEvent[] = [
     title: "SeeChange Studio, built in about five weeks",
     kind: "ship",
     note: "The AI video production platform, built in about five weeks.",
-    action: { type: "href", href: "/work/video-studio" },
+    action: { type: "href", href: "/blog/video-studio" },
   },
   {
     start: "2026-08-03",
@@ -32,7 +32,7 @@ export const calEvents: CalEvent[] = [
     title: "AI Photobooth live at SCMUN 2026",
     kind: "event",
     note: "Deployed at Joseph Lee Hall, and I was the person in charge on site.",
-    action: { type: "href", href: "/work/photobooth" },
+    action: { type: "href", href: "/blog/photobooth" },
   },
   // CV: "\role{AI Engineer Intern}{Jun 2024 -- Jul 2024}{Seth Biotech}{Hong Kong}"
   {

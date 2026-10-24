@@ -114,7 +114,7 @@ export default function MenuBar({ app, onAction, onSearch, onControlCentre, cont
         id: "help", label: "Help",
         items: [
           { label: "Search", shortcut: "⌘K", action: { type: "search" } },
-          { label: "Read the case studies", action: { type: "href", href: "/work" } },
+          { label: "Read the case studies", action: { type: "href", href: "/blog" } },
         ],
       },
     ];

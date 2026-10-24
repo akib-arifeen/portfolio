@@ -30,7 +30,7 @@ export default async function PlayPage({ params }: Props) {
         <Link href="/" className="back">Back to the site</Link>
         <h1 className="play__name">{item.name}</h1>
         <div className="play__actions">
-          {item.workSlug && getWork(item.workSlug) ? <Link className="chip" href={`/work/${item.workSlug}`}>Case study</Link> : null}
+          {item.workSlug && getWork(item.workSlug) ? <Link className="chip" href={`/blog/${item.workSlug}`}>Case study</Link> : null}
           <a className="chip" href={item.url} target="_blank" rel="noreferrer">Open in new tab</a>
         </div>
       </header>

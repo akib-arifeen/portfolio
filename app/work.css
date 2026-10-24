@@ -1,6 +1,6 @@
-/* Work index, case studies and /play. Tokens only: no raw colours. */
+/* Shared by /blog, its case studies, /projects, /profile and /play. Tokens only: no raw colours. */
 
-.work { padding-block: var(--space-lg) var(--space-3xl); }
+.work { padding-block: calc(var(--space-lg) + var(--space-2xl)) var(--space-3xl); }
 .work__nav { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm) var(--space-md); padding-block: var(--space-md) var(--space-xl); }
 .back { display: inline-flex; align-items: center; min-height: 2.75rem; font-size: var(--text-sm); color: var(--color-ink-2); text-underline-offset: 0.25em; }
 .back::before { content: "\2190"; margin-right: var(--space-xs); }

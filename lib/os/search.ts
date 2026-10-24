@@ -32,7 +32,7 @@ const PROJECT_SLUGS: Record<string, string> = {
 
 const PAGES: { id: string; title: string; href: string; keywords: string[]; newTab?: boolean }[] = [
   { id: "home", title: "Home", href: "/", keywords: ["portfolio", "start"] },
-  { id: "work", title: "All work", href: "/work", keywords: ["case studies", "projects", "index"] },
+  { id: "work", title: "All work", href: "/blog", keywords: ["case studies", "projects", "index"] },
   { id: "sound", title: "Sound", href: "/#sound", keywords: ["audio", "music"] },
   { id: "about", title: "About", href: "/#about", keywords: ["me", "bio", "akib"] },
   { id: "cv", title: "CV", href: "/akib-arifeen-cv.pdf", keywords: ["resume", "pdf"], newTab: true },
@@ -54,7 +54,7 @@ function walkFiles(dir: string, out: { path: string; folder: string; file: FsFil
 
 /**
  * Everything searchable, with unique ids: every registry app, every project folder and every case study in
- * lib/work.ts (opening /work/<slug>), every note, photo, browser site, playground item and terminal command, every file
+ * lib/work.ts (opening /blog/<slug>), every note, photo, browser site, playground item and terminal command, every file
  * on the laptop outside Projects, and the site's own pages (Home, Work, Sound, About, the CV PDF).
  */
 export function buildIndex(): SearchItem[] {
@@ -84,13 +84,13 @@ export function buildIndex(): SearchItem[] {
       title: node.name,
       subtitle: "Project",
       keywords: slug ? [slug, ...(work?.stack ?? [])] : undefined,
-      action: slug && hasWork ? { type: "href", href: `/work/${slug}` } : { type: "open", app: "files", arg: { path: `${projectsDir}/${node.name}` } },
+      action: slug && hasWork ? { type: "href", href: `/blog/${slug}` } : { type: "open", app: "files", arg: { path: `${projectsDir}/${node.name}` } },
     });
   }
 
   for (const w of allWorks()) {
     if (covered.has(w.slug)) continue;
-    add({ id: `work:${w.slug}`, kind: "page", title: w.title, subtitle: "Case study", keywords: [w.slug, ...w.stack], action: { type: "href", href: `/work/${w.slug}` } });
+    add({ id: `work:${w.slug}`, kind: "page", title: w.title, subtitle: "Case study", keywords: [w.slug, ...w.stack], action: { type: "href", href: `/blog/${w.slug}` } });
   }
 
   for (const n of notes) {

@@ -40,7 +40,7 @@ function Card({ work, large }: { work: Work; large: boolean }) {
           <span className="hbadge">{work.status}</span>
         </p>
         <h3 className="hcard__title">
-          <Link className="hcard__link" href={`/work/${work.slug}`}>{work.title}</Link>
+          <Link className="hcard__link" href={`/blog/${work.slug}`}>{work.title}</Link>
         </h3>
         <p className="hcard__summary">{work.summary}</p>
         {work.outcome ? (
