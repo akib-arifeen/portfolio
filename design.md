@@ -139,11 +139,13 @@ must extend the same rule rather than restate it.
   **Blog · Projects · Profile**, in that order. Studio-specific controls (the sound toggle) may sit
   in the same pill as a utility, visually separated from the three links. The CV lives under
   Profile, not in the nav.
-- **Footer — Ft5, statement.** A large Fraunces statement line, then a quiet row of links and the
-  letter-style sign-off. The footer keeps its current structure; content pages reuse it and add a
-  link to Profile for the CV.
+- **Footer — Ft5, statement, home only.** A large Fraunces statement line, then a quiet row of
+  links and the letter-style sign-off. It stays on `/`; content pages end with their own close —
+  `/blog` with the "Work with me" CTA, `/profile` with the contact links, `/projects` with the
+  media gallery.
 
-Both are one component each. A page does not draw its own nav; it renders the shared one.
+The nav is one component; a page does not draw its own, it renders the shared one. The letter
+footer is markup on the home page, not a component content pages mount.
 
 ## 7. Page structure
 
@@ -161,12 +163,16 @@ The strongest of the two old presentations, not a compromise between them.
 
 1. Kicker and `h1`: what this is (case studies and essays about the work).
 2. A short lede in `--text-md`.
-3. **Cases**: visual cards with cover media, title, summary, status badge and outcome figure —
-   the presentation `/work` already had.
-4. **Essays**: text cards with title, summary and date.
-5. Email CTA with the CV download.
+3. **Selected stories**: the two live case studies as visual cards with cover media, title,
+   summary, status badge and outcome figure — the presentation `/work` already had.
+4. **Notes and essays**: the three essays as note panels — dated kicker, accent rule, a
+   "Read the note" cue and no borrowed screenshot. They sit third, not last.
+5. **More project stories**: every remaining case study in the same visual card grid.
+6. Email CTA with a `Profile and CV` link. The CV download itself lives on `/profile`; the blog
+   points at the person rather than dropping a PDF from a page about the work.
 
-Cases come before essays. A reader who wants evidence should not have to scroll past prose.
+Two selected cases open the feed, the essays follow them, and the rest of the catalogue closes it.
+The essays are evidence of how the work was made, so they belong in the feed rather than after it.
 
 ### `/blog/[slug]` — cases and essays in one template
 
@@ -181,8 +187,10 @@ Every project once, nothing invented.
 
 1. Kicker and `h1`.
 2. Filter row: plain links to `/projects?show=all|products|games|experiments`, rendered from the
-   URL so they work without JavaScript, with `aria-current="page"` on the active one and a real
-   `aria-label` on the group. No `<div role="tab">` theatre, no client state for filtering.
+   URL so they work without JavaScript, with `aria-current="true"` on the active filter and a real
+   `aria-label` on the group. Page navigation — the nav links, the crumb — marks itself with
+   `aria-current="page"`; the filter row is a set of options, so it says `"true"`. No
+   `<div role="tab">` theatre, no client state for filtering.
 3. Grouped lists: **Products**, **Games**, **Experiments**, each a grid of compact cards carrying
    name, one line, honest status, and a link out (case study, playable slice, or repo — whichever
    genuinely exists).
@@ -236,8 +244,11 @@ case study for the blog.
 
 ## 10. Accessibility floor
 
-- Every interactive target is at least 44×44 CSS px including padding, at every breakpoint from
-  320px up.
+- The targets this work owns are at least 44×44 CSS px including padding on a coarse pointer,
+  from 320px up: the wordmark, the nav links, the icon buttons and the short footer links are
+  widened for touch by CSS alone. It is not a claim about every target on the site — fine-pointer
+  nav keeps its 36px height, and the pre-existing home strip links (32px) and studio tool buttons
+  (36px) are unchanged.
 - Focus is visible: `--color-focus` ring, never `outline: none` without a replacement.
 - Landmarks: one `h1` per page, `main`, `nav` with an accessible name, `footer`.
 - Video: `controls`, `preload="none"`, a poster, and an `aria-label` naming the piece. Never
