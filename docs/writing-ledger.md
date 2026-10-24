@@ -18,10 +18,10 @@ Rules applied:
 
 Source prefixes used below:
 
-- `SYP/` = `/Users/seechange/work-dir/akib/SYP/`
-- `WORK_RECORD` = `/Users/seechange/work-dir/akib/cv/WORK_RECORD.md`
-- `HANDOVER` = `/Users/seechange/work-dir/t&S/video-studio-agent-R-handover/`
-- `PRINT_AGENT` = `/Users/seechange/work-dir/t&S/print-agent/`
+- `SYP/` = `<workspace>/SYP/`
+- `WORK_RECORD` = `<workspace>/cv/WORK_RECORD.md`
+- `HANDOVER` = `<workspace>/video-studio-agent-R-handover/`
+- `PRINT_AGENT` = `<workspace>/print-agent/`
 - repo paths are relative to this worktree unless absolute
 
 ---
