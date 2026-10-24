@@ -9,7 +9,10 @@ Rules applied:
   the alternative and its engineering consequence, a measured result with a source, or a direct
   record written by Akib.
 - Case study modules (`lib/cases/*.ts`) are draft indices. They are cited only where they restate a
-  primary record, and never as evidence of motivation or feeling.
+  primary record, and never as evidence of motivation or feeling. One limited exception: where a case
+  module is itself the only record of a technical shape, it is cited as the sole source and the row
+  says so. Rows 2.5 (the `UPDATE` claim) and 2.6 (the work split) are that exception; nothing else here
+  relies on a case module alone.
 - No invented feeling, dialogue, scene, motivation, or metric. Where a number could not be found, the
   copy says so instead of estimating.
 - Visible copy uses no em dash, no en dash, no emoji. Numeric ranges use a plain hyphen.
@@ -32,7 +35,7 @@ Related work: `save-your-princess`. Public link: `https://syp-playtest.vercel.ap
 |---|---|---|---|
 | 1.1 | The first build had no bright pixels; the rooms read as flat cardboard. | `SYP/game/docs/GAP-ANALYSIS.md` §3.1 (line 198, table row line 207, line 219); `SYP/DECISIONS.md` LIGHT-005 (lines 2026 to 2032) | "Flat cardboard" is my description of a measurement, not a quoted opinion. The measurement is the evidence. |
 | 1.2 | Cause is arithmetic: `col = ramp(N·L) * albedo`, and the ramp's ceiling is the mood key colour. | `SYP/DECISIONS.md` LIGHT-005 body, same lines; `SYP/game/src/states/chamber.ts` lines 53 to 57 | Stated as the recorded cause. I did not re-derive it for the essay. |
-| 1.3 | Chamber stone albedo was `#101318`, about 4% reflectance, so the key colour is multiplied down before the grade runs. | `SYP/DECISIONS.md` LIGHT-005; `chamber.ts` lines 53 to 57 | Qualitative only. The essay does **not** compute a pixel value from 4% and 52%: the product is not self-evident from the record and the source does not print it, so no derived figure is quoted. "About 4%" is the record's own rounding. |
+| 1.3 | Chamber stone albedo was `#101318`, about 4% reflectance, so the key colour is multiplied down before the grade runs. | `SYP/DECISIONS.md` LIGHT-005; `chamber.ts` lines 53 to 57 | Qualitative only. The records do print the figure: LIGHT-005 says a 4% albedo at the shock key's 52% luma "multiplies to ~10/255", and `chamber.ts` repeats "could never exceed ~10/255". The stated inputs do not reproduce it, though: 0.04 times 0.52 times 255 is about 5, not 10, so the number was dropped and the copy keeps the qualitative point. "About 4%" is the record's own rounding. |
 | 1.4 | Measurement was taken on the 1280 by 800 chamber frame with the HUD and the caption band excluded. | `SYP/DECISIONS.md` LIGHT-005; method described in `GAP-ANALYSIS.md` §3.1 | One frame, one resolution. Not a sample of scenes. |
 | 1.5 | Before: 0.00% of pixels above 200, p99 76. | `SYP/DECISIONS.md` LIGHT-005; baseline p99 76 also in `GAP-ANALYSIS.md` table row `chamber` (line 207) | These four values (0.00%, 2.73%, 76, 237) appear only in this essay. |
 | 1.6 | After: 2.73% of pixels above 200, p99 237. | `SYP/DECISIONS.md` LIGHT-005 | Same frame and same method as 1.5, so the pair is comparable. No claim about other scenes. |
@@ -42,16 +45,17 @@ Related work: `save-your-princess`. Public link: `https://syp-playtest.vercel.ap
 | 1.10 | Fog was treated as a depth cue (intensity 0.62 to 0.30), and a sky factor keeps the window visible through it. | `SYP/DECISIONS.md` LIGHT-005 fourth bullet | The essay keeps the direction of the change and drops the exact cap value. |
 | 1.11 | Each side wall got one practical candle that warms as each pane is set; the requirement is structural, because a 14 by 18 metre room lit by one distant window has void corners. | `SYP/DECISIONS.md` LIGHT-005 fifth bullet; `chamber.ts` sconce constants (`SCONCE_COLD`, `SCONCE_WARM`) | "14 by 18 metre" is the record's own room size. |
 | 1.12 | The window has a world behind it: night sky, moon with a halo, city roofline. | `SYP/DECISIONS.md` LIGHT-005 sixth bullet; `chamber.ts` `SKY_TOP`, `SKY_LOW`, `MOON_COLOR` | No claim about how the sky was drawn beyond "behind the glass". |
-| 1.13 | The lighting change shipped with MEND on 24 October. | `SYP/game` git `86b194a` ("MECH-004: MEND becomes a finished game, and the room finds its light"), 2026-10-24 05:39 +0800, touching `src/core/mood.ts` and `src/states/chamber.ts` | The essay prints neither the hash nor the file list: the commit is the evidence behind the dated sentence, not copy. It is the rendering commit, not the portfolio's `33451bf`, which only refreshed this site. |
+| 1.13 | The lighting change landed with MEND on 24 October. | `SYP/game` git `86b194a` ("MECH-004: MEND becomes a finished game, and the room finds its light"), 2026-10-24 05:39 +0800, touching `src/core/mood.ts` and `src/states/chamber.ts` | The essay prints neither the hash nor the file list: the commit is the evidence behind the dated sentence, not copy. It is the rendering commit, not the portfolio's `33451bf`, which only refreshed this site. |
 | 1.14 | Consequence recorded in tests: the LUT golden values were regenerated for the two changed moods and the other four are untouched. | `SYP/DECISIONS.md` LIGHT-005 last bullet; `SYP/game/test/moodLut.test.ts` lines 42 to 45 and 59 to 62 | Stated as a recorded consequence, not as a test count. |
 | 1.15 | What is unproven: the number is a desktop frame. There are phone captures, but the same measurement was not run on one. | `SYP/DECISIONS.md` LIGHT-005 (frame is 1280 by 800); phone captures committed in `SYP/game` `02eafd3` | Explicit limitation. The essay does not claim the phone reads the same. |
 | 1.16 | The public slice is live at the URL above. | `lib/cases/save-your-princess.ts` line 14 (`links[0]`); checked 2026-10-24: `curl -L` returned HTTP 200 | Same URL the case study links. HTTPS check is also pinned by a unit test. |
 
 Claims deliberately not made: that the game is finished; that the window is the brightest object in
 the frame (the record gives it only as a fog consequence, and it was not measured); any pixel value
-derived from the 4% albedo and the 52% key luminance, such as 10 of 255 (the record does not print
-that arithmetic); that the room feels or reads a particular way emotionally; that the slice performs
-at a stated frame rate on a phone; any player or review reaction.
+derived from the 4% albedo and the 52% key luminance, such as 10 of 255 (both records print that
+figure, but the stated inputs reproduce about 5, so it is not used); that the room feels or reads a
+particular way emotionally; that the slice performs at a stated frame rate on a phone; any player or
+review reaction.
 
 ---
 
@@ -99,7 +103,7 @@ Related work: `photobooth`. No public live link.
 | 3.11 | Scope: the print agent is a separate project from the booth application. | `PRINT_AGENT/README.md` ("This is a separate project from the Think-and-Speak codebase") | Attribution stays as the README states it. |
 | 3.12 | The guest flow: walk up, talk to ARI, pick a look, wait while the photo is restyled, leave with a card. | `WORK_RECORD` §3.2 "Flow" line (attract, capture, style, generating, result, confirm, QR, interview, print, bye); `lib/cases/photobooth.ts` steps block | Summarised to the steps the essay needs. The mic interview and the QR step are left out, not denied. |
 | 3.13 | The booth laptop should not need a development setup, which is why the agent ships as one file that installs itself. | `PRINT_AGENT/README.md` (one ~87 MB file, `--install` autostart, no admin rights, hidden background process, log file) and `PRINT_AGENT/scripts/build-exe.mjs` | Phrased as the requirement the packaging answers, not as a claim about the machine. The essay does not say what is installed on the booth laptop. |
-| 3.14 | The flow the agent is built for is a card out of the printer with no dialog in front of the guest. | `PRINT_AGENT/README.md` lines 3 to 7 ("prints the AI Photobooth's photos **silently** — no browser print dialog"); `PRINT_AGENT/agent.js` header lines 1 to 12 ("The browser can't print without showing its dialog ... prints it straight through the OS — no dialog") | Stated as the intended flow the service exists for, not as an observed print at an event. No guest, guest reaction, or run is described. |
+| 3.14 | The flow the agent is built for is a card out of the printer with no dialog in front of the guest. | `PRINT_AGENT/README.md` lines 3 to 7 ("prints the AI Photobooth's photos **silently** — no browser print dialog"); `PRINT_AGENT/agent.js` header lines 1 to 12 ("The browser can't print without showing its dialog ... prints it straight through the OS — no dialog") | Stated as the intended flow the service exists for, not as an observed print at an event. No specific guest and no observed run is described. |
 
 Claims deliberately not made: any statement that printing never failed; queues at the event, wait
 times, or guest reactions; any private photo, guest name, credential, internal screenshot, or the
@@ -115,7 +119,7 @@ essay needs.
 | `0.00%`, `2.73%`, `76`, `237` | SYP luminance measurement, before and after (p99 values are 76 and 237) | the-room-had-no-bright-pixels only |
 | `200-300` | Photobooth attendance range per event | when-the-photo-booth-had-to-just-work only |
 | `433`, `99 s` | Music score rendering time, unrelated to the render queue | nowhere in these three essays |
-| `255`, `10 of 255` | Bit depth, and a pixel value derived by multiplying 4% albedo by the 52% key luminance. The source does not print the derivation, and it does not reproduce the stated number: 0.04 times 0.52 times 255 is about 5 | nowhere in these three essays |
+| `255`, `10 of 255` | Bit depth, and the pixel value both records state for a 4% albedo at the 52% key luminance. The stated inputs do not reproduce that number: 0.04 times 0.52 times 255 is about 5 | nowhere in these three essays |
 
 ## Public link check
 
@@ -158,10 +162,11 @@ imply an attribution:
 3. The essay's attendance range is a record written by Akib on 2026-10-15, not an event log.
 4. No claim in any essay was checked with Akib in this task. Final wording approval is his, before
    production.
-5. The 10 of 255 arithmetic was cut in review. The record prints the 4% albedo and the 52% key
-   luminance but not their product, and 0.04 times 0.52 times 255 is about 5 rather than 10, so the
-   copy makes the qualitative point instead: a key colour multiplied by a 4% albedo cannot leave a
-   bright pixel.
+5. The 10 of 255 arithmetic was cut in review. LIGHT-005 and `chamber.ts` both print ~10/255 for a 4%
+   albedo at the 52% key luminance, but the stated inputs do not reproduce it: 0.04 times 0.52 times
+   255 is about 5 rather than 10. Since the number cannot be re-derived from the inputs the copy
+   gives, the copy makes the qualitative point instead: a key colour multiplied by a 4% albedo cannot
+   leave a bright pixel.
 6. The queue's first implementation is unsupported and excluded. No primary source records a
    check-then-write version; the only prose describing one is the case module, which is a draft index,
    so the copy describes only the race and the current `UPDATE` shape.

@@ -278,7 +278,7 @@ describe("evidence guards", () => {
     expect(syp).not.toMatch(/\b[0-9a-f]{7}\b/);
   });
 
-  it("does not invent a queue of guests or an exact attendance lift", () => {
+  it("does not invent a queue at the event and does not call the laptop a developer machine", () => {
     const booth = copyOf("when-the-photo-booth-had-to-just-work");
     expect(booth).not.toMatch(/\bqueue\b/i);
     expect(booth).not.toMatch(/not a developer machine/i);
