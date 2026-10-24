@@ -69,9 +69,9 @@ export default function BoothScreen({ booth: b, onStepAway }: { booth: Booth; on
               src="/work/photobooth/booth-print-preview.jpg"
               width={1600}
               height={930}
-              alt="The printed card this booth produces, shown in demo mode with my own photo"
+              alt="The printed card the real booth produces, shown in demo mode with my own photo"
             />
-            <figcaption className="booth__sample-cap">The print you leave with</figcaption>
+            <figcaption className="booth__sample-cap">The card the real booth prints</figcaption>
           </figure>
         )}
 
@@ -114,7 +114,8 @@ export default function BoothScreen({ booth: b, onStepAway }: { booth: Booth; on
             <>
               <h2 className="booth__title" id="booth-heading" data-booth-heading tabIndex={-1}>Step up and say cheese.</h2>
               <p className="booth__text">
-                A camera, a few looks and a printer. Nothing you take is stored here.
+                The kiosk in the room is a model of the booth I built: a camera, four looks and a card.
+                Nothing you take is stored here.
               </p>
               <ol className="booth__steps">
                 <li className="booth__step">
@@ -127,7 +128,7 @@ export default function BoothScreen({ booth: b, onStepAway }: { booth: Booth; on
                 </li>
                 <li className="booth__step">
                   <span className="booth__step-n" aria-hidden="true">3</span>
-                  <span><strong>Leave with a print.</strong> It comes out in this window, ready to download.</span>
+                  <span><strong>Leave with a card.</strong> It comes out in this window, ready to download.</span>
                 </li>
               </ol>
               <div className="booth__actions">
@@ -258,7 +259,7 @@ export default function BoothScreen({ booth: b, onStepAway }: { booth: Booth; on
         <p className="booth__note">
           {b.step === "developing"
             ? "Nothing is stored on this site."
-            : "A real booth I built for events: 200 to 300 guests a night."}
+            : "A real booth I built for events: 200 to 300 guests a night. This page is the demo."}
         </p>
       </div>
     </div>

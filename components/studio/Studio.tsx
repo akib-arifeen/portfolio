@@ -21,14 +21,14 @@ const CLICK_SLOP = 4;
 /** Where the camera looks when a spot is selected. */
 export const spotFocus: Record<StudioSpot, V3> = {
   video: [-0.55, 2.2, -3.0],
-  booth: [BOOTH_POS.x, 0.95, BOOTH_POS.z],
+  booth: [BOOTH_POS.x, 1.05, BOOTH_POS.z],
   lessons: [1.35, 2.15, -2.85],
   zoom: [1.95, 2.15, -2.85],
   workout: [2.55, 2.1, -2.85],
   culinary: [1.65, 1.45, -2.85],
   mic: [0.62, 1.5, -2.45],
-  me: [-0.6, 1.4, -1.88],
-  laptop: [-0.39, 1.35, -2.74],
+  me: [-0.45, 1.55, -2.45],
+  laptop: [-0.02, 1.18, -2.52],
 };
 
 export type StudioProps = {
@@ -133,7 +133,7 @@ function Scene({ phase, selected, onSelect, onCycleLight, onHover, reducedMotion
   const ortho = useRef<THREE.OrthographicCamera>(null);
   const orbit = useRef<OrbitHandle>(null);
   // one stable array: a fresh one each render would make R3F re-aim the pivot mid-orbit
-  const orbitTarget = useMemo(() => ROOM_CENTRE.toArray(), []);
+  const orbitTarget = useMemo(() => WORKSTATION.toArray(), []);
   const light = lights[phase];
 
   const spot = (id: StudioSpot, label: V3, children: ReactNode) => (
@@ -200,7 +200,7 @@ function Scene({ phase, selected, onSelect, onCycleLight, onHover, reducedMotion
       {spot("culinary", [0, 0.4, 0], <Pan />)}
       <Cyl r={0.09} h={0.18} position={[2.45, 1.43, -2.85]} color={c.cream} />
 
-      {spot("booth", [0, 0.75, 0], <Booth phase={phase} reducedMotion={reducedMotion} />)}
+      {spot("booth", [0, 0.75, 0], <Booth phase={phase} />)}
     </>
   );
 }
@@ -235,16 +235,16 @@ function Spot({ id, label, hovered, selected, onHover, onSelect, reducedMotion, 
 
 /* ── Camera: isometric, glides to what you pick, leans with the pointer ── */
 
-const ISO_DIR = new THREE.Vector3(1, 0.85, 1).normalize();
+/** A slightly lower lens than a full isometric: the visitor looks across the desk at the person, not down on the room. */
+const ISO_DIR = new THREE.Vector3(1, 0.66, 1).normalize();
 const RIGHT = new THREE.Vector3(1, 0, -1).normalize();
 const UP = new THREE.Vector3().crossVectors(RIGHT, ISO_DIR).multiplyScalar(-1).normalize();
-/** The room's visual centre, shared by the camera and the orbit controls so the two never disagree.
-    Offset off the geometric middle so the desk, not the empty floor beside it, is what the card centres on. */
-const ROOM_CENTRE = new THREE.Vector3(-0.46, 1.69, -0.89);
+/** The person and the laptop are what the card centres on; the window stays at the edge so the light has a source. */
+const WORKSTATION = new THREE.Vector3(-0.75, 1.6, -1.65);
 
 function CameraRig({ cam: camRef, controls: controlsRef, selected, reducedMotion, explore }: { cam: React.RefObject<THREE.OrthographicCamera | null>; controls: React.RefObject<OrbitHandle | null>; selected: StudioSpot | null; reducedMotion: boolean; explore: boolean }) {
   const { size } = useThree();
-  const target = useRef(ROOM_CENTRE.clone());
+  const target = useRef(WORKSTATION.clone());
   const goal = useMemo(() => new THREE.Vector3(), []);
   const tmp = useMemo(() => new THREE.Vector3(), []);
   const recovering = useRef(false);
@@ -259,9 +259,10 @@ function CameraRig({ cam: camRef, controls: controlsRef, selected, reducedMotion
     // while the visitor is dragging, OrbitControls owns the camera
     if (explore) return;
 
-    // the workstation is what the visitor came to see, so the framing is set for the person and the laptop:
-    // 6.0 of room height fills the card; the 8.6 width cap keeps the walls off the edge on a phone
-    const baseZoom = Math.min(size.width / 8.6, size.height / 6.0);
+    // person-first: a close, low frame on the face and hands. The phone crops the empty right side
+    // of the room rather than shrinking the workstation to fit it.
+    const phone = size.width < 600;
+    const baseZoom = Math.min(size.width / (phone ? 5.9 : 6.0), size.height / (phone ? 4.8 : 3.4));
     let zoom = baseZoom;
 
     if (selected === "laptop") {
@@ -271,7 +272,7 @@ function CameraRig({ cam: camRef, controls: controlsRef, selected, reducedMotion
       zoom = baseZoom * 1.5;
       goal.set(...spotFocus[selected]);
     } else {
-      goal.copy(ROOM_CENTRE);
+      goal.copy(WORKSTATION);
     }
 
     const k = reducedMotion ? 1 : 1 - Math.exp(-dt * 4.5);
@@ -329,7 +330,7 @@ function Lights({ phase, reducedMotion }: { phase: Phase; reducedMotion: boolean
   return (
     <>
       <ambientLight ref={amb} intensity={0.2} />
-      {/* soft fill from the visitor's side so the booth's face isn't lost in shadow */}
+      {/* soft fill from the visitor's side so the booth's front panel isn't lost in shadow */}
       {/* ds-allow-hardcode:start WebGL lights and CanvasTexture paint: CSS custom properties cannot reach a three.js light or a canvas texture, so these colours mirror tokens.css and palette.ts by hand. */}
       <directionalLight ref={fill} position={[10, 6, 10]} intensity={0.1} color="#fff1e0" />
       {/* the warm task light sits in front of the person, so a short throw from the visitor's side is what separates
@@ -479,14 +480,14 @@ function useLaptopDeckTexture() {
   return tex;
 }
 
-const LAPTOP_POS: V3 = [-0.3, 1.07, -2.44];
+const LAPTOP_POS: V3 = [-0.02, 1.07, -2.52];
 const LAPTOP_SCALE = 1.35;
 
 function Laptop() {
   const screen = useLaptopScreenTexture();
   const deck = useLaptopDeckTexture();
   return (
-    <group position={LAPTOP_POS} rotation={[0, 0.28, 0]} scale={LAPTOP_SCALE}>
+    <group position={LAPTOP_POS} rotation={[0, -Math.PI / 2 + 0.55, 0]} scale={LAPTOP_SCALE}>
       {/* base: a milled slab with a painted keyboard deck on top */}
       <Box size={[0.64, 0.03, 0.44]} position={[0, 0, 0]} color={c.laptop} />
       <mesh position={[0, 0.0162, 0]} rotation={[-Math.PI / 2, 0, 0]}>
