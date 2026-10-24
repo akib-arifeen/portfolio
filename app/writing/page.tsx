@@ -19,13 +19,13 @@ export default function WritingIndex() {
         <Link href="/work" className="back">All work</Link>
       </nav>
       <header className="work__head">
-        <p className="kicker">Writing</p>
+        <p className="kicker">Notes from the work</p>
         <h1 className="work__h1">Writing</h1>
         <p className="work__lede">{DESCRIPTION}</p>
       </header>
       <section className="wgroup" aria-labelledby="posts-h">
         <h2 id="posts-h" className="wgroup__title">Essays</h2>
-        <div className="wlist">
+        <div className="wlist wlist--essays">
           {posts.map((p) => (
             <article key={p.slug} className="wcard">
               <Link href={`/writing/${p.slug}`} className="wcard__link">

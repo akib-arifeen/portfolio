@@ -292,7 +292,7 @@ a { color: inherit; }
 [data-reveal="pending"] { opacity: 0; transform: translateY(8px); }
 [data-reveal="in"] { transition: opacity var(--dur-long) var(--ease-out), transform var(--dur-long) var(--ease-out); }
 
-.section__more { margin-top: var(--space-2xl); }
+.section__more { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-top: var(--space-2xl); }
 .more {
   display: inline-flex; align-items: center; gap: var(--space-xs);
   min-height: 2.75rem; padding-inline: var(--space-lg);

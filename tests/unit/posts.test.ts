@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getPost, posts, publishedPosts } from "@/lib/posts";
+import { formatPostDate, getPost, posts, publishedPosts } from "@/lib/posts";
 import type { Post } from "@/lib/posts";
 import { getWork } from "@/lib/work";
 
@@ -124,5 +124,12 @@ describe("post links", () => {
   it("has no public live link on the queue and photo booth essays", () => {
     expect(getPost("the-queue-that-waits-for-ram")?.liveUrl).toBeUndefined();
     expect(getPost("when-the-photo-booth-had-to-just-work")?.liveUrl).toBeUndefined();
+  });
+});
+
+describe("formatPostDate", () => {
+  it("writes an ISO date as a readable header date", () => {
+    expect(formatPostDate("2026-10-24")).toBe("24 October 2026");
+    expect(formatPostDate("2026-01-01")).toBe("1 January 2026");
   });
 });
