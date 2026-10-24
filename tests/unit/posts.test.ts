@@ -243,3 +243,55 @@ describe("editorial invariants", () => {
     expect(booth).not.toMatch(/300-person|exactly 300/i);
   });
 });
+
+/** Copy sentences, so an attribution can be checked within one sentence rather than across a paragraph. */
+const sentences = (s: string): string[] => s.split(/(?<=[.!?])\s+/).filter((x) => x.trim().length > 0);
+
+describe("evidence guards", () => {
+  it("does not give ComfyUI the narration or the captions", () => {
+    const queue = copyOf("the-queue-that-waits-for-ram");
+    for (const s of sentences(queue)) {
+      if (/narration|caption/i.test(s)) {
+        expect(s, `ComfyUI shares a sentence with narration or captions: ${s}`).not.toMatch(/ComfyUI/i);
+      }
+    }
+    // The other two halves of that split are named where they belong.
+    expect(queue).toMatch(/Chatterbox/);
+    expect(queue).toMatch(/Whisper/);
+  });
+
+  it("does not attribute a first implementation of the render queue", () => {
+    const queue = copyOf("the-queue-that-waits-for-ram");
+    expect(queue).not.toMatch(/first version|my first|I originally/i);
+  });
+
+  it("does not generalize about speed figures elsewhere on the site", () => {
+    const queue = copyOf("the-queue-that-waits-for-ram");
+    expect(queue).not.toMatch(/speed figure|elsewhere on this site|borrow a number/i);
+  });
+
+  it("keeps the SYP essay off unmeasured brightness, derived arithmetic and commit hashes", () => {
+    const syp = copyOf("the-room-had-no-bright-pixels");
+    expect(syp).not.toMatch(/brightest/i);
+    expect(syp).not.toMatch(/\b255\b/);
+    // A seven-character hex token is a commit hash in prose, not a claim a reader can check in the copy.
+    expect(syp).not.toMatch(/\b[0-9a-f]{7}\b/);
+  });
+
+  it("does not invent a queue of guests or an exact attendance lift", () => {
+    const booth = copyOf("when-the-photo-booth-had-to-just-work");
+    expect(booth).not.toMatch(/\bqueue\b/i);
+    expect(booth).not.toMatch(/not a developer machine/i);
+  });
+
+  it("does not assert an observed guest reaction", () => {
+    const booth = copyOf("when-the-photo-booth-had-to-just-work");
+    expect(booth).not.toMatch(/guest(s)? (sees|saw|reacts?|notices)/i);
+  });
+
+  it("qualifies the loopback binding as a default", () => {
+    const booth = copyOf("when-the-photo-booth-had-to-just-work");
+    expect(booth).toMatch(/binds to loopback by default/);
+    expect(booth).not.toMatch(/loopback only/i);
+  });
+});
