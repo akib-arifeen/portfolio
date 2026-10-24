@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CATEGORIES, projectEntries, projectsIn, resolveShow } from "@/lib/projects";
 import { MediaGallery } from "@/components/projects/MediaGallery";
+import { SiteNav } from "@/components/SiteNav";
 import "../work.css";
 import "../projects.css";
 
@@ -31,9 +32,7 @@ export default async function ProjectsPage({ searchParams }: Props) {
 
   return (
     <main className="wrap projects">
-      <nav className="work__nav" aria-label="Site">
-        <Link href="/" className="back">Back to the studio</Link>
-      </nav>
+      <SiteNav current="/projects" />
 
       <header className="projects__head">
         <p className="kicker">Everything I have built</p>
@@ -50,7 +49,7 @@ export default async function ProjectsPage({ searchParams }: Props) {
             key={f.id}
             href={f.id === "all" ? "/projects" : `/projects?show=${f.id}`}
             className="chip"
-            aria-current={active === f.id ? "page" : undefined}
+            aria-current={active === f.id ? "true" : undefined}
           >
             {f.label}
           </Link>

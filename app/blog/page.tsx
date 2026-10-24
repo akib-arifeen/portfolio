@@ -4,6 +4,7 @@ import { caseEntries, essayEntries } from "@/lib/blog";
 import type { Work } from "@/lib/work";
 import { contact } from "@/lib/content";
 import { BlogCard } from "@/components/blog/BlogCard";
+import { SiteNav } from "@/components/SiteNav";
 import "../work.css";
 
 const DESCRIPTION =
@@ -25,9 +26,7 @@ export default function BlogIndex() {
 
   return (
     <main className="wrap work">
-      <nav className="work__nav" aria-label="Site">
-        <Link href="/" className="back">Back to the studio</Link>
-      </nav>
+      <SiteNav current="/blog" />
 
       <header className="work__head">
         <p className="kicker">Case studies and essays</p>
@@ -69,7 +68,7 @@ export default function BlogIndex() {
         <p>I like owning a product from the first vague ask to the thing people use. If you have one, write to me.</p>
         <p className="links">
           <a className="chip chip--accent" href={`mailto:${contact.email}`}>{contact.email}</a>
-          <a className="chip" href={contact.cv} download>Download my CV</a>
+          <Link className="chip" href="/profile">Profile and CV</Link>
         </p>
       </section>
     </main>

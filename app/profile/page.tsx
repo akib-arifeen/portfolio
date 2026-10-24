@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { contact } from "@/lib/content";
 import { education, experience, headline, skills, statement } from "@/lib/profile";
+import { SiteNav } from "@/components/SiteNav";
 import { Timeline } from "@/components/profile/Timeline";
 import "../work.css";
 import "../profile.css";
@@ -18,9 +18,7 @@ export const metadata: Metadata = {
 export default function ProfilePage() {
   return (
     <main className="wrap profile">
-      <nav className="work__nav" aria-label="Site">
-        <Link href="/" className="back">Back to the studio</Link>
-      </nav>
+      <SiteNav current="/profile" />
 
       <header className="profile__head">
         <p className="kicker">{headline}</p>

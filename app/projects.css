@@ -1,7 +1,7 @@
 /* Projects catalog. Tokens only. Shared primitives (kicker, badge, chip, links) come from
    globals.css and work.css; everything here is specific to the catalog. */
 
-.projects { padding-block: var(--space-lg) var(--space-3xl); }
+.projects { padding-block: calc(var(--space-lg) + var(--space-2xl)) var(--space-3xl); }
 
 .projects__head { display: grid; gap: var(--space-md); margin-bottom: var(--space-xl); }
 .projects__h1 { font-size: var(--text-display); }
@@ -10,7 +10,7 @@
 /* Filters are links to a URL, so they work with no JavaScript and can be shared. */
 .projects__filters { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-bottom: var(--space-2xl); }
 .projects__filters .chip { min-height: 2.75rem; }
-.projects__filters .chip[aria-current="page"] {
+.projects__filters .chip[aria-current] {
   background: var(--color-ink);
   border-color: var(--color-ink);
   color: var(--color-paper);

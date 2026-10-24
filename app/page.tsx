@@ -36,8 +36,8 @@ export default function Page() {
           </div>
           <WorkGrid />
           <p className="section__more">
-            <Link className="more" href="/work">All work <span aria-hidden="true">&rarr;</span></Link>
-            <Link className="more" href="/writing">Writing <span aria-hidden="true">&rarr;</span></Link>
+            <Link className="more" href="/blog">All work <span aria-hidden="true">&rarr;</span></Link>
+            <Link className="more" href="/projects">Projects <span aria-hidden="true">&rarr;</span></Link>
           </p>
         </div>
       </section>
@@ -115,7 +115,7 @@ export default function Page() {
             <nav className="letter__links" aria-label="Elsewhere">
               <a href={contact.linkedin}>LinkedIn</a>
               <a href={contact.github}>GitHub</a>
-              <a href={contact.cv} download>Download CV</a>
+              <Link href="/profile">Profile</Link>
             </nav>
           </div>
         </div>

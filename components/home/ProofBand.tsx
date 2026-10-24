@@ -3,10 +3,10 @@ import CountUp from "./CountUp";
 
 // Every figure is from WORK_RECORD.md section 7 (or the lesson pipeline estimate, labelled as one).
 const proof = [
-  { value: "200 to 300", label: "Guests at each photobooth event", href: "/work/photobooth", cue: "AI photobooth" },
-  { value: "50% faster", label: "Faster video generation, alongside new 4K output", href: "/work/video-studio", cue: "AI video platform" },
-  { value: "~80%", label: "Less time per lesson, an estimate", href: "/work/lesson-pipeline", cue: "AI lesson pipeline" },
-  { value: "150 GB", label: "Of Zoom cloud storage freed", href: "/work/zoom-backup", cue: "Zoom automation" },
+  { value: "200 to 300", label: "Guests at each photobooth event", href: "/blog/photobooth", cue: "AI photobooth" },
+  { value: "50% faster", label: "Faster video generation, alongside new 4K output", href: "/blog/video-studio", cue: "AI video platform" },
+  { value: "~80%", label: "Less time per lesson, an estimate", href: "/blog/lesson-pipeline", cue: "AI lesson pipeline" },
+  { value: "150 GB", label: "Of Zoom cloud storage freed", href: "/blog/zoom-backup", cue: "Zoom automation" },
 ];
 
 export default function ProofBand() {

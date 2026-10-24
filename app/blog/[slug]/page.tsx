@@ -9,6 +9,7 @@ import { contact } from "@/lib/content";
 import { Block } from "@/components/work/Block";
 import { MediaItem } from "@/components/work/MediaItem";
 import { BlogCard } from "@/components/blog/BlogCard";
+import { SiteNav } from "@/components/SiteNav";
 import "../../work.css";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -44,9 +45,7 @@ function CaseArticle({ work }: { work: Work }) {
 
   return (
     <main className="wrap work">
-      <nav className="work__nav" aria-label="Case study">
-        <Link href="/blog" className="back">All writing</Link>
-      </nav>
+      <SiteNav current="/blog" />
 
       <header className="case__head">
         <p className="kicker">{work.kicker}</p>
@@ -125,9 +124,7 @@ function EssayArticle({ post }: { post: Post }) {
 
   return (
     <main className="wrap work">
-      <nav className="work__nav" aria-label="Essay">
-        <Link href="/blog" className="back">All writing</Link>
-      </nav>
+      <SiteNav current="/blog" />
 
       <header className="case__head">
         <p className="kicker"><time dateTime={post.date}>{formatPostDate(post.date)}</time></p>

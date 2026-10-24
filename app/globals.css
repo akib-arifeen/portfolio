@@ -117,7 +117,6 @@ a { color: inherit; }
   .wordmark__short { display: inline; }
   .nav__pill { gap: var(--space-xs); padding-left: var(--space-sm); }
   .nav__link { padding-inline: 0.4rem; }
-  .nav__link--sound { display: none; }
 }
 
 .chip {
@@ -157,6 +156,10 @@ a { color: inherit; }
 .chip[aria-pressed="true"] { background: var(--color-ink); color: var(--color-paper-2); border-color: var(--color-ink); }
 .chip:active { transform: scale(0.97); }
 @media (pointer: coarse) { .chip { min-height: 44px; } }
+/* Nav links are the smallest targets on the site; give them a full touch height without widening the pill. */
+@media (pointer: coarse) {
+  .wordmark, .nav__link { display: inline-flex; align-items: center; min-height: 44px; }
+}
 .chip:disabled { opacity: 0.45; cursor: not-allowed; }
 @media (hover: hover) and (pointer: fine) {
   .chip:hover:not(:disabled):not([aria-pressed="true"]) { background: var(--color-paper-3); border-color: var(--color-muted); }

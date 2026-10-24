@@ -1,7 +1,7 @@
 /* Profile: the person, factually. Tokens only. Shared primitives (kicker, chip, back) come from
    globals.css and work.css. */
 
-.profile { padding-block: var(--space-lg) var(--space-3xl); }
+.profile { padding-block: calc(var(--space-lg) + var(--space-2xl)) var(--space-3xl); }
 
 .profile__head { display: grid; gap: var(--space-md); margin-bottom: var(--space-2xl); }
 .profile__h1 { font-size: var(--text-display); }
