@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { facts, styles, type StyleId } from "@/lib/booth";
 import { studioSound } from "@/lib/sound";
 
-export type BoothStep = "intro" | "pose" | "countdown" | "developing" | "printing" | "done" | "error";
+export type BoothStep = "intro" | "pose" | "countdown" | "preview" | "developing" | "printing" | "done" | "error";
 export type BoothProblem = "camera" | "not-configured" | "limit" | "failed" | null;
 
 const SAMPLE = "/desk/akib.jpg";
@@ -32,7 +32,7 @@ function loadImage(src: string) {
   });
 }
 
-/** The printed card: photo, cream border, a small studio stamp. Colours come from the page tokens. */
+/** The printed card: photo, cream border, a small studio stamp. The card is cream even on a dark page, so it uses the print tokens. */
 async function printCard(photo: string, styleName: string) {
   const css = getComputedStyle(document.documentElement);
   const tok = (n: string) => css.getPropertyValue(n).trim();
@@ -42,7 +42,7 @@ async function printCard(photo: string, styleName: string) {
   canvas.width = cw;
   canvas.height = ch;
   const g = canvas.getContext("2d")!;
-  g.fillStyle = tok("--color-paper");
+  g.fillStyle = tok("--color-print-paper");
   g.fillRect(0, 0, cw, ch);
   const s = Math.max(pw / img.width, ph / img.height);
   g.save();
@@ -51,24 +51,24 @@ async function printCard(photo: string, styleName: string) {
   g.clip();
   g.drawImage(img, pad + (pw - img.width * s) / 2, pad + (ph - img.height * s) / 2, img.width * s, img.height * s);
   g.restore();
-  const display = tok("--font-fraunces") || "Georgia";
+  const display = tok("--font-accent") || "Georgia";
   const body = tok("--font-geist") || "sans-serif";
   const y = pad + ph + 92;
-  g.fillStyle = tok("--color-ink");
+  g.fillStyle = tok("--color-print-ink");
   g.font = `600 56px ${display}, Georgia, serif`;
   g.fillText("Akib’s Studio", pad, y);
-  g.fillStyle = tok("--color-muted");
+  g.fillStyle = tok("--color-print-muted");
   g.font = `400 26px ${body}, sans-serif`;
   const date = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
   g.fillText(`${styleName} · ${date}`, pad, y + 46);
-  g.fillStyle = tok("--color-accent");
+  g.fillStyle = tok("--color-print-accent");
   g.beginPath();
   g.arc(cw - pad - 22, y - 18, 22, 0, Math.PI * 2);
   g.fill();
   return canvas.toDataURL("image/png");
 }
 
-/** Everything the booth does, independent of how it's drawn (the 3D screen and the HUD both read this). */
+/** Everything the booth does, independent of how it is drawn. The dialog reads this and nothing else. */
 export function useBooth(active: boolean) {
   const [step, setStep] = useState<BoothStep>("intro");
   const [problem, setProblem] = useState<BoothProblem>(null);
@@ -77,7 +77,6 @@ export function useBooth(active: boolean) {
   const [card, setCard] = useState<string | null>(null);
   const [count, setCount] = useState(3);
   const [fact, setFact] = useState(0);
-  const [flashKey, setFlashKey] = useState(0);
   const [live, setLive] = useState(false);
   const stream = useRef<MediaStream | null>(null);
   const videoEl = useRef<HTMLVideoElement | null>(null);
@@ -105,7 +104,7 @@ export function useBooth(active: boolean) {
     setLive(false);
   }, []);
 
-  // attach the stream whenever the <video> on the booth screen (re)mounts
+  // attach the stream whenever the <video> in the dialog (re)mounts
   const videoRef = useCallback((el: HTMLVideoElement | null) => {
     videoEl.current = el;
     if (el && stream.current && el.srcObject !== stream.current) {
@@ -117,7 +116,7 @@ export function useBooth(active: boolean) {
   const reset = useCallback(() => {
     newSession();
     stopCamera();
-    setStep("intro"); setProblem(null); setCapture(null); setCard(null);
+    setStep("intro"); setProblem(null); setCapture(null); setCard(null); setCount(3);
   }, [newSession, stopCamera]);
 
   useEffect(() => {
@@ -137,13 +136,15 @@ export function useBooth(active: boolean) {
     if (starting.current) return; // a second click while the permission prompt is open must not open a second stream
     starting.current = true;
     const sid = session.current;
+    setProblem(null);
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 960 } }, audio: false });
       if (!isLive(sid)) { s.getTracks().forEach((t) => t.stop()); return; } // the visitor left while the prompt was up
+      stream.current?.getTracks().forEach((t) => t.stop());
       stream.current = s;
       setLive(true);
       setCapture(null);
-      setProblem(null);
+      setCard(null);
       setStep("pose");
       if (videoEl.current) { videoEl.current.srcObject = s; videoEl.current.play().catch(() => {}); }
     } catch {
@@ -163,7 +164,8 @@ export function useBooth(active: boolean) {
       if (!isLive(sid)) return;
       setCapture(toJpeg(img, img.width, img.height, false));
       setProblem(null);
-      setStep("pose");
+      setCard(null);
+      setStep("preview");
     } catch {
       if (!isLive(sid)) return;
       setProblem("failed");
@@ -215,11 +217,12 @@ export function useBooth(active: boolean) {
   };
 
   const shoot = () => {
-    if (step === "countdown") return;
-    if (capture && !stream.current) return develop(capture, style, newSession()); // a still photo (sample, or restyling)
+    if (step === "countdown" || !stream.current) return;
     const sid = newSession();
     let n = 3;
     setCount(n);
+    setProblem(null);
+    setCard(null);
     setStep("countdown");
     studioSound.blip("hover");
     countdown.current = setInterval(() => {
@@ -230,13 +233,25 @@ export function useBooth(active: boolean) {
       countdown.current = null;
       const v = videoEl.current;
       if (!v || !v.videoWidth) { setProblem("camera"); setStep("error"); return; }
-      setFlashKey((k) => k + 1);
       studioSound.blip("click");
       const shot = toJpeg(v, v.videoWidth, v.videoHeight, true);
       stopCamera();
       setCapture(shot);
-      develop(shot, style, sid);
+      setStep("preview");
     }, 900);
+  };
+
+  /** Step out of a countdown without taking the photo. */
+  const cancelCountdown = () => {
+    newSession();
+    setCount(3);
+    setStep(stream.current ? "pose" : capture ? "preview" : "intro");
+  };
+
+  /** The visitor is happy with the photo: send it to be restyled. */
+  const confirm = () => {
+    if (!capture) return;
+    develop(capture, style, newSession());
   };
 
   const download = () => {
@@ -247,13 +262,14 @@ export function useBooth(active: boolean) {
     a.click();
   };
 
-  const tryAnother = () => { newSession(); setCard(null); setProblem(null); setStep("pose"); };
-  const retake = () => { newSession(); setCard(null); setProblem(null); startCamera(); };
-  const presented = () => setStep("done");
+  const tryAnother = () => { newSession(); setCard(null); setProblem(null); setStep("preview"); };
+  const retake = () => { newSession(); setCard(null); setProblem(null); setCapture(null); startCamera(); };
+  /** Idempotent: the dialog schedules this once, and a late call must not move a newer step. */
+  const presented = () => setStep((s) => (s === "printing" ? "done" : s));
 
   return {
-    step, problem, style, setStyle, capture, card, count, fact, flashKey, live,
-    videoRef, startCamera, useSample, shoot, download, tryAnother, retake, presented, reset,
+    step, problem, style, setStyle, capture, card, count, fact, live,
+    videoRef, startCamera, useSample, shoot, confirm, cancelCountdown, download, tryAnother, retake, presented, reset,
   };
 }
 

@@ -106,16 +106,18 @@ export default function Page() {
 
       <footer className="letter">
         <div className="wrap">
-          <p className="letter__body">
-            Thanks for walking through. If something here would help your team, write to me at{" "}
-            <a href={`mailto:${contact.email}`}>{contact.email}</a>.
+          <p className="letter__statement">
+            If something here would help your team, I’d like to hear about it.
           </p>
-          <p className="letter__sign">Akib, Hong Kong, 2026</p>
-          <nav className="letter__links" aria-label="Elsewhere">
-            <a href={contact.linkedin}>LinkedIn</a>
-            <a href={contact.github}>GitHub</a>
-            <a href={contact.cv} download>Download CV</a>
-          </nav>
+          <a className="letter__mail" href={`mailto:${contact.email}`}>{contact.email} ↗</a>
+          <div className="letter__meta">
+            <p>Akib Arifeen · Hong Kong · 2026</p>
+            <nav className="letter__links" aria-label="Elsewhere">
+              <a href={contact.linkedin}>LinkedIn</a>
+              <a href={contact.github}>GitHub</a>
+              <a href={contact.cv} download>Download CV</a>
+            </nav>
+          </div>
         </div>
       </footer>
     </main>

@@ -1,52 +1,50 @@
-/* Hallmark · genre: editorial · macrostructure: Marquee Hero · H1 knobs: size=xl, alignment=left-bias, underlay=none
- * theme: custom · vibe: "cosy late-evening studio, lamp-warm, calm" · paper: oklch(95.5% 0.012 75) · accent: oklch(63% 0.15 33)
- * display: Fraunces (roman) · body: Geist · outlier: Geist Mono (studio clock only) · axes: light / roman-serif / warm
- * enrichment: custom interactive 3D diorama (React Three Fiber) · nav: N9 edge-aligned · footer: Ft6 letter close
+/* Hallmark · genre: atmospheric · macrostructure: Workbench · H1 knobs: size=xl, alignment=left, underlay=none
+ * theme: custom · vibe: "late-night workbench, warm lamp against blue-grey, quiet" · paper: oklch(17% 0.014 255) · accent: oklch(72% 0.14 48)
+ * display: Geist 600 (roman) · body: Geist 400 · accent: Fraunces (statement footer, print, booth art only) · outlier: Geist Mono
+ * axes: dark / grotesk-sans / warm · enrichment: custom interactive 3D room · nav: N5 floating pill · footer: Ft5 statement
  * studied: no · context: inferred from PORTFOLIO_PLAN.md
  */
 
 :root {
-  /* ── Colour · warm paper, warm ink, one coral accent ───────────── */
-  --color-paper:      oklch(95.5% 0.012 75);
-  --color-paper-2:    oklch(92.5% 0.015 75);
-  --color-paper-3:    oklch(89% 0.018 72);
-  --color-ink:        oklch(22% 0.012 60);
-  --color-ink-2:      oklch(38% 0.012 60);
-  --color-muted:      oklch(52% 0.012 62);
-  --color-rule:       oklch(80% 0.014 70);
-  --color-rule-2:     oklch(87% 0.012 72);
-  --color-accent:     oklch(63% 0.15 33);
+  /* ── Colour · deep blue-grey paper, warm ink, one amber accent ─── */
+  --color-paper:      oklch(17% 0.014 255);
+  --color-paper-2:    oklch(20% 0.016 255);
+  --color-paper-3:    oklch(24% 0.018 255);
+  --color-ink:        oklch(94% 0.010 75);
+  --color-ink-2:      oklch(80% 0.012 255);
+  --color-muted:      oklch(72% 0.018 255);
+  --color-rule:       oklch(31% 0.018 255);
+  --color-rule-2:     oklch(26% 0.016 255);
+  --color-accent:     oklch(72% 0.14 48);
   --color-accent-ink: oklch(97% 0.01 75);
-  /* accent dark enough for --color-accent-ink text: 4.77:1 (WCAG AA); plain --color-accent gives only 3.43:1 */
-  --color-accent-strong: oklch(55% 0.15 33);
-  --color-focus:      oklch(58% 0.19 33);
-  --color-scrim:      oklch(22% 0.012 60 / 0.08);
+  /* dark enough for --color-accent-ink text: 4.90:1 (WCAG AA); plain --color-accent gives 2.53:1 on cream text */
+  --color-accent-strong: oklch(52% 0.15 48);
+  --color-focus:      oklch(79% 0.18 48);
+  --color-scrim:      oklch(8% 0.012 255 / 0.4);
+  --color-backdrop:   oklch(11% 0.012 255 / 0.82);
+  --color-glow-cool:  oklch(62% 0.09 245 / 0.3);
+  --color-glow-warm:  oklch(72% 0.14 48 / 0.22);
 
-  /* the laptop — a darker, evening screen and its app-icon tints */
-  --color-desk:       oklch(30% 0.03 50);
-  --color-desk-2:     oklch(36% 0.03 50);
+  /* the laptop layer keeps its own evening screen palette */
+  --color-desk:       oklch(22% 0.02 255);
+  --color-desk-2:     oklch(28% 0.022 255);
   --color-desk-ink:   oklch(93% 0.015 75);
   --color-desk-mark:  oklch(36% 0.035 50);
   --color-icon-amber: oklch(78% 0.12 75);
   --color-icon-sage:  oklch(68% 0.07 140);
   --color-icon-blue:  oklch(62% 0.08 245);
   --color-icon-plum:  oklch(52% 0.09 340);
-  --color-terminal:   oklch(20% 0.01 60);
+  --color-terminal:   oklch(14% 0.012 255);
   --color-terminal-ink: oklch(88% 0.08 140);
 
-  /* the photobooth layer — the booth's coral, deepened so cream text reads on it */
-  --color-booth:        oklch(42% 0.12 33);
-  --color-booth-2:      oklch(48% 0.12 33);
-  --color-booth-ink:    oklch(96% 0.012 75);
-  --color-booth-muted:  oklch(86% 0.03 60);
-  --color-booth-rule:   oklch(62% 0.1 35);
-  --color-booth-shadow: oklch(20% 0.06 33 / 0.5);
+  /* the print: a cream card that leaves the booth warm, whatever the page is */
+  --color-print-paper: oklch(95% 0.016 80);
+  --color-print-ink:   oklch(24% 0.014 60);
+  --color-print-muted: oklch(46% 0.016 60);
+  --color-print-accent: oklch(52% 0.15 48);
 
-  /* the ARI booth identity — used sparingly against the booth's warm coral */
-  --color-ari:      oklch(68% 0.13 228);
-  --color-ari-gold: oklch(76% 0.11 80);
-  --color-ari-ink:  oklch(24% 0.05 250);
-  --color-ari-rim:  oklch(68% 0.13 228 / 0.38);
+  /* the laptop's file browser tags playable demos with the booth's coral, on the light window */
+  --color-booth: oklch(42% 0.12 33);
 
   /* ── akibOS — the laptop layer: macOS-like chrome and glass, light + dark.
      The chrome worker owns these VALUES and may add --os-* tokens here; the names below are the contract. ── */
@@ -108,7 +106,8 @@
   --os-icon-about-b: oklch(55% 0.15 30);
 
   /* ── Type ──────────────────────────────────────────────────────── */
-  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-display: var(--font-geist), ui-sans-serif, sans-serif;
+  --font-accent:  var(--font-fraunces), ui-serif, Georgia, serif;
   --font-body:    var(--font-geist), ui-sans-serif, sans-serif;
   --font-outlier: var(--font-geist-mono), ui-monospace, monospace;
 
@@ -118,7 +117,7 @@
   --text-md:   1.25rem;
   --text-lg:   1.5625rem;
   --text-xl:   1.9531rem;
-  --text-display: clamp(2.5rem, 4.2vw + 1rem, 5.25rem);
+  --text-display: clamp(2.6rem, 2.2vw + 1.7rem, 4.6rem);
 
   --leading-display: 1.04;
   --leading-body: 1.6;
@@ -140,6 +139,7 @@
   --rule-thick: 2px;
   --radius-sm: 6px;
   --radius-md: 12px;
+  --radius-lg: 18px;
 
   /* ── Motion ────────────────────────────────────────────────────── */
   --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);

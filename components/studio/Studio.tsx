@@ -1,22 +1,27 @@
 "use client";
 
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { Html, OrthographicCamera, PerformanceMonitor, PerspectiveCamera } from "@react-three/drei";
-import { Component, memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Html, OrbitControls, OrthographicCamera, PerformanceMonitor } from "@react-three/drei";
+import { Component, memo, useCallback, useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from "react";
 import * as THREE from "three";
 import { Box, Cyl, Room } from "./Room";
 import Akib, { type AkibPose } from "./Akib";
 import StudioFallback from "./StudioFallback";
 import { lights, scene as c, type Phase } from "./palette";
-import { BOOTH_FOV, BOOTH_POS, Booth, BoothRig, PrintedCard } from "./Photobooth";
+import { BOOTH_POS, Booth } from "./Photobooth";
 import { spotLabels, type StudioSpot } from "@/lib/content";
 
 type V3 = [number, number, number];
+/** The OrbitControls instance drei hands back through its ref. */
+type OrbitHandle = ComponentRef<typeof OrbitControls>;
+
+/** A press that travels further than this is a drag (orbiting the room), not a pick. */
+const CLICK_SLOP = 4;
 
 /** Where the camera looks when a spot is selected. */
 export const spotFocus: Record<StudioSpot, V3> = {
   video: [-0.55, 2.2, -3.0],
-  booth: [BOOTH_POS.x, 0.85, BOOTH_POS.z],
+  booth: [BOOTH_POS.x, 0.95, BOOTH_POS.z],
   lessons: [1.35, 2.15, -2.85],
   zoom: [1.95, 2.15, -2.85],
   workout: [2.55, 2.1, -2.85],
@@ -34,12 +39,8 @@ export type StudioProps = {
   onHover: () => void;
   reducedMotion: boolean;
   paused?: boolean;
-  /** booth mode: walk up to the photobooth and use its screen */
-  boothMode?: boolean;
-  boothScreen?: (width: number) => ReactNode;
-  cardUrl?: string | null;
-  onCardPresented?: () => void;
-  flashKey?: number;
+  /** Direct manipulation: drag to orbit the room within its front arc. */
+  explore: boolean;
   /** Overrides the character's pose (the "Ask Akib" panel drives it); undefined keeps the default. */
   akibPose?: AkibPose;
   /** 0 to 1 mouth openness while the pose is "talk". */
@@ -85,6 +86,15 @@ function Gate({ onChange }: { onChange: (awake: boolean) => void }) {
   return null;
 }
 
+/** OrbitControls stamps touch-action:none on the event container when it connects and never clears it, so a drag over the room would swallow the page scroll. Keep it in step with explore. */
+function TouchScroll({ explore }: { explore: boolean }) {
+  const el = useThree((st) => st.events.connected as HTMLElement | undefined);
+  useEffect(() => {
+    if (el) el.style.touchAction = explore ? "none" : "pan-y";
+  }, [el, explore]);
+  return null;
+}
+
 function Studio(props: StudioProps) {
   const [webgl] = useState(hasWebGL);
   const [awake, setAwake] = useState(true);
@@ -103,7 +113,8 @@ function Studio(props: StudioProps) {
         dpr={dpr}
         frameloop={running ? "always" : "never"}
         gl={{ antialias: true, alpha: true }}
-        onPointerMissed={() => { if (!props.boothMode) props.onSelect(null); }}
+        style={{ touchAction: props.explore ? "none" : "pan-y" }}
+        onPointerMissed={() => props.onSelect(null)}
         role="group"
         aria-label="A 3D studio. Use the buttons beside it to look at each object."
       >
@@ -117,17 +128,16 @@ function Studio(props: StudioProps) {
 
 export default memo(Studio);
 
-function Scene({ phase, selected, onSelect, onCycleLight, onHover, reducedMotion, boothMode = false, boothScreen, cardUrl, onCardPresented, flashKey = 0, akibPose, akibMouth, active }: Omit<StudioProps, "paused"> & { active: boolean }) {
+function Scene({ phase, selected, onSelect, onCycleLight, onHover, reducedMotion, explore, akibPose, akibMouth, active }: Omit<StudioProps, "paused"> & { active: boolean }) {
   const [hovered, setHovered] = useState<StudioSpot | "window" | null>(null);
-  const [cardLifted, setCardLifted] = useState(false);
   const ortho = useRef<THREE.OrthographicCamera>(null);
-  const persp = useRef<THREE.PerspectiveCamera>(null);
+  const orbit = useRef<OrbitHandle>(null);
+  // one stable array: a fresh one each render would make R3F re-aim the pivot mid-orbit
+  const orbitTarget = useMemo(() => ROOM_CENTRE.toArray(), []);
   const light = lights[phase];
-  useEffect(() => { if (!cardUrl) setCardLifted(false); }, [cardUrl]);
 
-  // in booth mode the room is scenery: nothing else is clickable. The wrapper stays mounted either way, so props keep their textures.
   const spot = (id: StudioSpot, label: V3, children: ReactNode) => (
-    <Spot id={id} label={label} hovered={hovered} selected={selected} reducedMotion={reducedMotion} disabled={boothMode}
+    <Spot id={id} label={label} hovered={hovered} selected={selected} reducedMotion={reducedMotion} disabled={false}
       onHover={(h) => { if (h && h !== hovered) onHover(); setHovered(h); }} onSelect={onSelect}>
       {children}
     </Spot>
@@ -135,12 +145,28 @@ function Scene({ phase, selected, onSelect, onCycleLight, onHover, reducedMotion
 
   return (
     <>
-      <OrthographicCamera ref={ortho} makeDefault={!boothMode} position={[12, 10, 12]} zoom={60} near={0.1} far={200} />
-      <PerspectiveCamera ref={persp} makeDefault={boothMode} fov={BOOTH_FOV} near={0.05} far={100} />
-      <CameraRig cam={ortho} selected={selected} reducedMotion={reducedMotion} />
-      <BoothRig cam={persp} active={boothMode} reducedMotion={reducedMotion} />
+      <OrthographicCamera ref={ortho} makeDefault position={[12, 10, 12]} zoom={60} near={0.1} far={200} />
+      <CameraRig cam={ortho} controls={orbit} selected={selected} reducedMotion={reducedMotion} explore={explore} />
+      <OrbitControls
+        ref={orbit}
+        enabled={explore}
+        target={orbitTarget}
+        enablePan={false}
+        enableZoom={false}
+        enableDamping={!reducedMotion}
+        dampingFactor={0.08}
+        rotateSpeed={0.55}
+        minAzimuthAngle={0.45}
+        maxAzimuthAngle={1.15}
+        minPolarAngle={0.82}
+        maxPolarAngle={1.22}
+      />
+      <TouchScroll explore={explore} />
       <Lights phase={phase} reducedMotion={reducedMotion} />
-      <Room sky={light.sky} />
+      {/* bare walls and floor are the way back out of a selection: props stop the click before it reaches here */}
+      <group onClick={(e) => { if (e.delta > CLICK_SLOP) return; e.stopPropagation(); onSelect(null); }}>
+        <Room sky={light.sky} />
+      </group>
 
       {/* window hotspot: click to change the light */}
       <mesh
@@ -148,7 +174,7 @@ function Scene({ phase, selected, onSelect, onCycleLight, onHover, reducedMotion
         rotation={[0, Math.PI / 2, 0]}
         onPointerOver={(e) => { e.stopPropagation(); setHovered("window"); document.body.style.cursor = "pointer"; onHover(); }}
         onPointerOut={() => { setHovered((h) => (h === "window" ? null : h)); document.body.style.cursor = ""; }}
-        onClick={(e) => { e.stopPropagation(); onCycleLight(); }}
+        onClick={(e) => { if (e.delta > CLICK_SLOP) return; e.stopPropagation(); onCycleLight(); }}
       >
         <planeGeometry args={[2.0, 1.5]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
@@ -159,7 +185,7 @@ function Scene({ phase, selected, onSelect, onCycleLight, onHover, reducedMotion
         )}
       </mesh>
 
-      {spot("video", [0, 0.75, 0], <Monitor phase={phase} playing={active && !reducedMotion && !boothMode} />)}
+      {spot("video", [0, 0.75, 0], <Monitor phase={phase} playing={active && !reducedMotion} />)}
       {spot("laptop", [0, 0.45, 0.2], <Laptop />)}
       <Lamp phase={phase} />
       {spot("mic", [0, 0.75, 0], <Mic />)}
@@ -174,13 +200,7 @@ function Scene({ phase, selected, onSelect, onCycleLight, onHover, reducedMotion
       {spot("culinary", [0, 0.4, 0], <Pan />)}
       <Cyl r={0.09} h={0.18} position={[2.45, 1.43, -2.85]} color={c.cream} />
 
-      {spot("booth", [0, 0.75, 0], (
-        <Booth boothMode={boothMode} screen={boothMode && !cardLifted ? boothScreen : undefined} flashKey={flashKey} phase={phase} reducedMotion={reducedMotion} />
-      ))}
-      {boothMode && cardUrl && (
-        <PrintedCard key={cardUrl} url={cardUrl} cam={persp} reducedMotion={reducedMotion}
-          onLift={() => setCardLifted(true)} onPresented={() => onCardPresented?.()} />
-      )}
+      {spot("booth", [0, 0.75, 0], <Booth phase={phase} reducedMotion={reducedMotion} />)}
     </>
   );
 }
@@ -202,7 +222,7 @@ function Spot({ id, label, hovered, selected, onHover, onSelect, reducedMotion, 
   const over = (e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); onHover(id); document.body.style.cursor = "pointer"; };
   const out = () => { if (hovered === id) onHover(null); document.body.style.cursor = ""; };
   return (
-    <group ref={ref} onPointerOver={disabled ? undefined : over} onPointerOut={disabled ? undefined : out} onClick={disabled ? undefined : (e) => { e.stopPropagation(); onSelect(id); }}>
+    <group ref={ref} onPointerOver={disabled ? undefined : over} onPointerOut={disabled ? undefined : out} onClick={disabled ? undefined : (e) => { if (e.delta > CLICK_SLOP) return; e.stopPropagation(); onSelect(id); }}>
       {children}
       {!disabled && hovered === id && selected !== id && (
         <Html position={[spotFocus[id][0] + label[0], spotFocus[id][1] + label[1], spotFocus[id][2] + label[2]]} center zIndexRange={[15, 0]}>
@@ -218,37 +238,43 @@ function Spot({ id, label, hovered, selected, onHover, onSelect, reducedMotion, 
 const ISO_DIR = new THREE.Vector3(1, 0.85, 1).normalize();
 const RIGHT = new THREE.Vector3(1, 0, -1).normalize();
 const UP = new THREE.Vector3().crossVectors(RIGHT, ISO_DIR).multiplyScalar(-1).normalize();
-const ROOM_CENTRE = new THREE.Vector3(0, 1.2, 0);
+/** The room's visual centre, shared by the camera and the orbit controls so the two never disagree.
+    Offset off the geometric middle so the desk, not the empty floor beside it, is what the card centres on. */
+const ROOM_CENTRE = new THREE.Vector3(-0.46, 1.69, -0.89);
 
-function CameraRig({ cam: camRef, selected, reducedMotion }: { cam: React.RefObject<THREE.OrthographicCamera | null>; selected: StudioSpot | null; reducedMotion: boolean }) {
+function CameraRig({ cam: camRef, controls: controlsRef, selected, reducedMotion, explore }: { cam: React.RefObject<THREE.OrthographicCamera | null>; controls: React.RefObject<OrbitHandle | null>; selected: StudioSpot | null; reducedMotion: boolean; explore: boolean }) {
   const { size } = useThree();
   const target = useRef(ROOM_CENTRE.clone());
   const goal = useMemo(() => new THREE.Vector3(), []);
   const tmp = useMemo(() => new THREE.Vector3(), []);
+  const recovering = useRef(false);
+  const wasExplore = useRef(explore);
 
   useFrame((state, dt) => {
-    const wide = size.width >= 960;
-    // narrow: the plinth is 6.6 m square turned 45 degrees, so it is 9.3 m wide on screen; 10.2 keeps both sides in frame
-    const baseZoom = wide ? Math.min(size.width / 15.6, size.height / 9.6) : Math.min(size.width / 10.2, size.height / 7.4);
-    const viewWidth = size.width / baseZoom;
+    const cam = camRef.current;
+    if (!cam) return;
+    // handover: the orbit pivot follows this rig every frame, so explore on or off never re-aims the camera
+    controlsRef.current?.target.copy(target.current);
+    if (wasExplore.current !== explore) { recovering.current = !explore; wasExplore.current = explore; }
+    // while the visitor is dragging, OrbitControls owns the camera
+    if (explore) return;
+
+    // the workstation is what the visitor came to see, so the framing is set for the person and the laptop:
+    // 6.0 of room height fills the card; the 8.6 width cap keeps the walls off the edge on a phone
+    const baseZoom = Math.min(size.width / 8.6, size.height / 6.0);
     let zoom = baseZoom;
 
     if (selected === "laptop") {
-      zoom = baseZoom * 4.5; // dive toward the screen; the desk overlay crossfades in on top
+      zoom = baseZoom * 3.4; // dive toward the screen; the laptop layer crossfades in on top
       goal.set(...spotFocus.laptop);
     } else if (selected) {
-      zoom = baseZoom * (wide ? 1.6 : 1.45);
+      zoom = baseZoom * 1.5;
       goal.set(...spotFocus[selected]);
-      if (wide) goal.addScaledVector(RIGHT, (size.width / zoom) * 0.2); // object sits left of the panel
-      else goal.addScaledVector(UP, -(size.height / zoom) * 0.12);
     } else {
       goal.copy(ROOM_CENTRE);
-      if (wide) goal.addScaledVector(RIGHT, -viewWidth * 0.16); // room sits right, headline left
     }
 
-    const cam = camRef.current;
-    if (!cam) return;
-    const k = reducedMotion ? 1 : 1 - Math.exp(-dt * 3.2);
+    const k = reducedMotion ? 1 : 1 - Math.exp(-dt * 4.5);
     target.current.lerp(goal, k);
     cam.zoom += (zoom - cam.zoom) * k;
 
@@ -256,7 +282,13 @@ function CameraRig({ cam: camRef, selected, reducedMotion }: { cam: React.RefObj
     if (!reducedMotion) {
       tmp.addScaledVector(RIGHT, state.pointer.x * 0.5).addScaledVector(UP, state.pointer.y * 0.35);
     }
-    cam.position.copy(tmp);
+    if (recovering.current) {
+      // back from an orbit: glide home, then hand the camera straight back to the exact path above
+      cam.position.lerp(tmp, k);
+      if (cam.position.distanceToSquared(tmp) < 1e-5) { cam.position.copy(tmp); recovering.current = false; }
+    } else {
+      cam.position.copy(tmp);
+    }
     cam.lookAt(target.current);
     cam.updateProjectionMatrix();
   });
@@ -270,6 +302,7 @@ function Lights({ phase, reducedMotion }: { phase: Phase; reducedMotion: boolean
   const amb = useRef<THREE.AmbientLight>(null);
   const hemi = useRef<THREE.HemisphereLight>(null);
   const fill = useRef<THREE.DirectionalLight>(null);
+  const spill = useRef<THREE.PointLight>(null);
   const born = useRef<number | null>(null);
   const colour = useMemo(() => new THREE.Color(), []);
 
@@ -284,6 +317,7 @@ function Lights({ phase, reducedMotion }: { phase: Phase; reducedMotion: boolean
       sun.current.color.lerp(colour.set(L.sun), k);
     }
     if (fill.current) fill.current.intensity += (0.55 * entrance - fill.current.intensity) * k;
+    if (spill.current) spill.current.intensity += (2.0 * entrance - spill.current.intensity) * k;
     if (amb.current) amb.current.intensity += (L.ambient * entrance - amb.current.intensity) * k;
     if (hemi.current) {
       hemi.current.color.lerp(colour.set(L.hemiSky), k);
@@ -298,6 +332,9 @@ function Lights({ phase, reducedMotion }: { phase: Phase; reducedMotion: boolean
       {/* soft fill from the visitor's side so the booth's face isn't lost in shadow */}
       {/* ds-allow-hardcode:start WebGL lights and CanvasTexture paint: CSS custom properties cannot reach a three.js light or a canvas texture, so these colours mirror tokens.css and palette.ts by hand. */}
       <directionalLight ref={fill} position={[10, 6, 10]} intensity={0.1} color="#fff1e0" />
+      {/* the warm task light sits in front of the person, so a short throw from the visitor's side is what separates
+          his head and hands from the back wall; 3 m of reach stops it before the booth */}
+      <pointLight ref={spill} position={[-0.15, 2.3, -1.25]} intensity={0} color="#ffd2a1" distance={3} decay={2} />
       <hemisphereLight ref={hemi} intensity={0.2} />
       <directionalLight
         ref={sun}
@@ -371,142 +408,12 @@ function Monitor({ phase, playing }: { phase: Phase; playing: boolean }) {
   );
 }
 
-/** The laptop's own desktop in miniature (warm wallpaper, a thin menu bar, a dock of coloured squircles), so the dive into the screen lands on the real thing. */
-function paintLaptopScreen(g: CanvasRenderingContext2D, w: number, h: number) {
-  const sky = g.createLinearGradient(w * 0.1, 0, w * 0.4, h);
-  sky.addColorStop(0, "#f4e6ce"); sky.addColorStop(0.55, "#f3c7a2"); sky.addColorStop(1, "#f2a07c");
-  g.fillStyle = sky;
-  g.fillRect(0, 0, w, h);
-  const glow = g.createRadialGradient(w * 0.72, h * 0.28, 0, w * 0.72, h * 0.28, w * 0.42);
-  glow.addColorStop(0, "rgba(255,181,124,0.75)"); glow.addColorStop(1, "rgba(255,181,124,0)");
-  g.fillStyle = glow;
-  g.fillRect(0, 0, w, h);
-  [["#e49f75", 0.6], ["#d67e5b", 0.7], ["#ad6352", 0.8], ["#854b42", 0.9]].forEach(([col, at], i) => {
-    const y = h * (at as number);
-    g.globalAlpha = 0.55 - i * 0.04;
-    g.fillStyle = col as string;
-    g.beginPath();
-    g.moveTo(0, y);
-    g.bezierCurveTo(w * 0.25, y - h * 0.09, w * 0.5, y + h * 0.06, w, y - h * 0.06);
-    g.lineTo(w, h);
-    g.lineTo(0, h);
-    g.fill();
-  });
-  g.globalAlpha = 1;
-
-  // corners fall away so the windows, not the wallpaper, carry the screen
-  const vignette = g.createRadialGradient(w * 0.5, h * 0.45, h * 0.18, w * 0.5, h * 0.45, w * 0.72);
-  vignette.addColorStop(0, "rgba(28,20,17,0)");
-  vignette.addColorStop(1, "rgba(28,20,17,0.36)");
-  g.fillStyle = vignette;
-  g.fillRect(0, 0, w, h);
-
-  // menu bar: an "a" monogram, a few menu words as bars, status bits on the right
-  g.fillStyle = "rgba(255,250,244,0.55)";
-  g.fillRect(0, 0, w, 24);
-  g.fillStyle = "#d4614a";
-  g.beginPath();
-  g.arc(18, 12, 8, 0, Math.PI * 2);
-  g.fill();
-  g.fillStyle = "#fdfbf9";
-  g.font = "700 12px Georgia, serif";
-  g.textAlign = "center";
-  g.textBaseline = "middle";
-  g.fillText("a", 18, 12.5);
-  g.fillStyle = "rgba(56,50,45,0.6)";
-  [34, 28, 32, 30].reduce((x, bw) => { g.fillRect(x, 9, bw, 6); return x + bw + 12; }, 40);
-  [18, 12, 30].reduce((x, bw) => { g.fillRect(x - bw, 9, bw, 6); return x - bw - 10; }, w - 14);
-
-  // two windows of actual work: an editor with a few coloured lines, a terminal mid-build
-  const panel = (x: number, y: number, pw: number, ph: number, r: number) => {
-    g.beginPath(); g.roundRect(x, y, pw, ph, r); g.fill();
-  };
-  g.fillStyle = "rgba(30,26,24,0.94)";
-  panel(40, 36, 372, 238, 10);
-  g.fillStyle = "rgba(255,255,255,0.07)";
-  g.fillRect(40, 36, 372, 24);
-  ["#e8735c", "#e8b45c", "#86c58a"].forEach((col, i) => {
-    g.fillStyle = col;
-    g.beginPath(); g.arc(52 + i * 12, 48, 3.4, 0, Math.PI * 2); g.fill();
-  });
-  g.fillStyle = "rgba(255,255,255,0.42)";
-  g.font = "600 11px ui-monospace, monospace";
-  g.textAlign = "left";
-  g.fillText("studio.tsx", 98, 48.5);
-  const code: [number, string][] = [
-    [0, "#e2a76f"], [1, "#8fc7d8"], [1, "#b9d18a"], [2, "#d0a3c8"],
-    [2, "#e2c07a"], [1, "#8fc7d8"], [1, "#b9d18a"], [2, "#e2c07a"],
-    [1, "#d0a3c8"], [0, "#8fc7d8"],
-  ];
-  code.forEach(([indent, col], i) => {
-    const y = 84 + i * 19;
-    g.fillStyle = "rgba(255,255,255,0.18)";
-    g.fillRect(50, y - 2, 10, 4);
-    let x = 72 + indent * 15;
-    const widths = [34 + (i % 3) * 13, 18 + (i % 2) * 11, 48 - (i % 4) * 9, 13];
-    widths.forEach((bw, j) => {
-      g.fillStyle = j === 1 ? "rgba(255,255,255,0.5)" : col;
-      g.globalAlpha = j === 3 ? 0.5 : 0.92;
-      g.fillRect(x, y - 3, bw, 6);
-      x += bw + 8;
-    });
-    g.globalAlpha = 1;
-  });
-  g.fillStyle = "rgba(16,19,21,0.94)";
-  panel(428, 132, 196, 180, 10);
-  g.fillStyle = "rgba(255,255,255,0.32)";
-  g.font = "600 10px ui-monospace, monospace";
-  g.fillText("~/studio", 442, 150);
-  g.fillStyle = "#8fe3b0";
-  g.font = "11px ui-monospace, monospace";
-  g.fillText("$ npm run build", 442, 176);
-  g.fillStyle = "rgba(214,232,220,0.5)";
-  g.fillRect(442, 190, 96, 5);
-  g.fillRect(442, 205, 140, 5);
-  g.fillStyle = "rgba(143,227,176,0.85)";
-  g.fillRect(442, 220, 74, 5);
-  g.fillStyle = "#8fe3b0";
-  g.fillText("$ npm test", 442, 252);
-  g.fillStyle = "rgba(214,232,220,0.5)";
-  g.fillRect(442, 266, 118, 5);
-  g.fillStyle = "#8fe3b0";
-  g.fillRect(442, 284, 7, 11);
-
-  // dock: one squircle per app, in dock order
-  const icons: [string, string][] = [
-    ["#7ac8f5", "#3284d0"], ["#66cfe1", "#0c82bf"], ["#7fbef3", "#4b77cc"], ["#fddb7c", "#efa831"],
-    ["#f8edd8", "#e9cca6"], ["#fd7466", "#d33949"], ["#fdfbf9", "#ebe7e2"], ["#a67ad6", "#6744ac"],
-    ["#38322d", "#15110d"], ["#82d2a8", "#008f77"], ["#ed835e", "#b94739"],
-  ];
-  const size = 38, gap = 9, pad = 14;
-  const dockW = icons.length * size + (icons.length - 1) * gap + pad * 2;
-  const dockX = (w - dockW) / 2, dockY = h - size - pad * 2 - 8;
-  g.fillStyle = "rgba(255,250,244,0.42)";
-  g.beginPath();
-  g.roundRect(dockX, dockY, dockW, size + pad * 2, 22);
-  g.fill();
-  g.strokeStyle = "rgba(255,255,255,0.55)";
-  g.lineWidth = 1.5;
-  g.stroke();
-  icons.forEach(([a, b], i) => {
-    const x = dockX + pad + i * (size + gap), y = dockY + pad;
-    const grad = g.createLinearGradient(x, y, x, y + size);
-    grad.addColorStop(0, a); grad.addColorStop(1, b);
-    g.fillStyle = grad;
-    g.beginPath();
-    g.roundRect(x, y, size, size, 11);
-    g.fill();
-  });
-}
-
+/** The laptop shows a real screen from the video-studio project. If it cannot load, the screen stays dark — no invented desktop. */
 function useLaptopScreenTexture() {
   const tex = useMemo(() => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 640;
-    canvas.height = 400;
-    paintLaptopScreen(canvas.getContext("2d")!, 640, 400);
-    const t = new THREE.CanvasTexture(canvas);
+    const t = new THREE.TextureLoader().load("/work/video-studio/create-screen.png");
     t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
     return t;
   }, []);
   useEffect(() => () => tex.dispose(), [tex]);

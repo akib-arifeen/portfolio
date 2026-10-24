@@ -1,24 +1,24 @@
 // Scene colours. three.js materials can't read CSS custom properties, so the 3D palette lives here,
-// tuned to sit on the page's warm paper (tokens.css --color-paper) without fighting it.
+// tuned to sit on the page's deep blue-grey paper (tokens.css --color-paper) without fighting it.
 
 export const scene = {
-  base: "#d9cbb6",      // diorama plinth
-  baseEdge: "#c4b39b",
-  floor: "#c9a982",     // warm oak
-  wall: "#efe6d8",      // plaster, a shade off the paper
-  wallSide: "#e6dccc",
-  trim: "#d7c8b2",
-  desk: "#8a6446",      // walnut
-  deskLeg: "#3a332d",
-  metal: "#3a3734",
-  screenFrame: "#2b2927",
-  laptop: "#b9b4ad",
-  laptopEdge: "#8f8a83",
-  laptopPort: "#4c4842",
-  coral: "#d9654f",     // the photobooth — same hue as --color-accent
-  coralDark: "#b8503e",
-  cream: "#f5ecdf",
-  // the ARI booth: lacquer, brass and the mascot's cool light against the warm room
+  base: "#2b3038",      // diorama plinth, a step above the page
+  baseEdge: "#22262d",
+  floor: "#4a3b2c",     // warm oak, darkened for the evening
+  wall: "#3a4149",      // cool plaster
+  wallSide: "#323842",
+  trim: "#4a515b",
+  desk: "#5c4531",      // walnut
+  deskLeg: "#22262c",
+  metal: "#6a7280",
+  screenFrame: "#141a21",
+  laptop: "#4d545d",
+  laptopEdge: "#3a4048",
+  laptopPort: "#2a3038",
+  coral: "#d9714f",     // the photobooth — same hue as --color-accent
+  coralDark: "#b8543a",
+  cream: "#e8dccb",
+  // the booth identity: lacquer, brass and the mascot's cool light against the warm room
   boothBrass: "#b58a55",
   boothInk: "#20252a",
   boothHalo: "#7fe3e8",
@@ -28,20 +28,20 @@ export const scene = {
   ariGold: "#d9aa58",
   ariCheek: "#ef9bb0",
   ariInk: "#14243a",
-  rug: "#b9a07d",
-  rugInner: "#a98d68",
-  plantPot: "#c97e5a",
-  leaf: "#6f8a5b",
-  leafDark: "#5a734a",
-  book1: "#3f5a78",
-  book2: "#c99a4a",
-  book3: "#7a4b3c",
-  reel: "#2f2c2a",
+  rug: "#5d4a38",
+  rugInner: "#4d3c2c",
+  plantPot: "#9c5f44",
+  leaf: "#55705a",
+  leafDark: "#3f5747",
+  book1: "#40597a",
+  book2: "#b98c45",
+  book3: "#6d4336",
+  reel: "#26292e",
   skin: "#c8956f",
-  hoodie: "#4a5d6e",
+  hoodie: "#46566a",
   hair: "#2a2320",
-  stool: "#6b5a4a",
-  shade: "#f2e2c4",
+  stool: "#4e4134",
+  shade: "#e6d6b8",
   // the Akib character (Akib.tsx). three.js and the face canvas can't read CSS variables.
   akibSkin: "#a37455",
   akibSkinShade: "#8f5d3d",
@@ -81,11 +81,13 @@ export type Light = {
   screenGlow: number; // monitor brightness
 };
 
+// The room is a dark workbench in every phase: daylight comes in cool through the window,
+// the lamp carries the warmth, and the screens are the brightest things in the room.
 export const lights: Record<Phase, Light> = {
-  morning: { sky: "#cfe2ee", sun: "#ffe4c4", sunIntensity: 2.4, ambient: 0.75, hemiSky: "#f4efe6", hemiGround: "#cdb99c", lamp: 0, screenGlow: 0.9 },
-  day:     { sky: "#b9d6ec", sun: "#fff4e3", sunIntensity: 2.8, ambient: 0.9, hemiSky: "#f7f3ea", hemiGround: "#d2bfa3", lamp: 0, screenGlow: 0.8 },
-  evening: { sky: "#eea67c", sun: "#ffb37a", sunIntensity: 1.5, ambient: 0.5, hemiSky: "#f3d9c0", hemiGround: "#9e8467", lamp: 7, screenGlow: 1.2 },
-  night:   { sky: "#24314f", sun: "#8ea2cf", sunIntensity: 0.45, ambient: 0.3, hemiSky: "#5d6a8c", hemiGround: "#3b3029", lamp: 10, screenGlow: 1.5 },
+  morning: { sky: "#a9c7da", sun: "#e8f0f7", sunIntensity: 1.9, ambient: 0.42, hemiSky: "#8496a9", hemiGround: "#3a2f26", lamp: 1, screenGlow: 1.1 },
+  day:     { sky: "#bed9ea", sun: "#fff3e2", sunIntensity: 2.3, ambient: 0.5, hemiSky: "#93a6b9", hemiGround: "#40352a", lamp: 0, screenGlow: 1.0 },
+  evening: { sky: "#d9885d", sun: "#ffab74", sunIntensity: 1.15, ambient: 0.3, hemiSky: "#6d5f6c", hemiGround: "#2b211c", lamp: 9, screenGlow: 1.4 },
+  night:   { sky: "#1d2b46", sun: "#7e93c2", sunIntensity: 0.32, ambient: 0.22, hemiSky: "#3a4a68", hemiGround: "#1e1a19", lamp: 12, screenGlow: 1.7 },
 };
 
 export function phaseForHour(hour: number): Phase {

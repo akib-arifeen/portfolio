@@ -1,76 +1,28 @@
 "use client";
 
-import { Html, RoundedBox } from "@react-three/drei";
-import { useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { RoundedBox } from "@react-three/drei";
+import { useFrame } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Box, Cyl } from "./Room";
 import { scene as c, type Phase } from "./palette";
 
-/* The ARI photobooth: an arched lacquer cabinet, brass inlay, a marquee, a working screen,
+/* The ARI photobooth: an arched lacquer cabinet, brass inlay, a marquee, a resting screen,
    and the mascot on the crown. Built from geometry and canvas art — no image assets. */
 
-const now = () => performance.now() / 1000;
-
-/** A compact booth against the window wall: the desk and its screen own the room, this is scenery. */
-export const BOOTH_POS = new THREE.Vector3(-2.7, 0, 0.75);
+/** A near full-size booth against the window wall, in reach from the side of the room. */
+export const BOOTH_POS = new THREE.Vector3(-2.35, 0, 1.15);
 export const BOOTH_ROT = Math.PI / 2 - 0.4;
-export const BOOTH_SCALE = 0.46;
-const BOOTH_FWD = new THREE.Vector3(Math.sin(BOOTH_ROT), 0, Math.cos(BOOTH_ROT));
-export const BOOTH_FOV = 33;
+/** 0.82 puts the lens at about 1.5 m and the crown just under 2 m. */
+export const BOOTH_SCALE = 0.82;
 
 const SCREEN_W = 0.74;
 const SCREEN_H = SCREEN_W * 0.7;
 const SCREEN_Y = 1.33;
 const SLOT_Y = 0.735;
 const ARCH_W = 1.18;
-const ARCH_R = ARCH_W / 2;
 const ARCH_SPRING = 1.62; // where the arch starts curving
 const ARCH_BASE = 0.12;
-const VIEW_H = 2.14; // metres of booth in view when you walk up
-const VIEW_Y = 1.5; // camera height: the screen sits a little below the axis
-
-const toWorld = (x: number, y: number, z: number) =>
-  new THREE.Vector3(x * BOOTH_SCALE, y * BOOTH_SCALE, z * BOOTH_SCALE).applyAxisAngle(new THREE.Vector3(0, 1, 0), BOOTH_ROT).add(BOOTH_POS);
-const SCREEN_CENTRE = toWorld(0, SCREEN_Y, 0.512);
-const SLOT = toWorld(0, SLOT_Y, 0.47);
-
-/** How far to stand so the whole booth fits, and how wide its screen renders in CSS px. */
-function boothView(width: number, height: number) {
-  const t = Math.tan(THREE.MathUtils.degToRad(BOOTH_FOV / 2));
-  const viewH = VIEW_H * BOOTH_SCALE;
-  const d = viewH / (2 * t);
-  const visibleW = viewH * (width / height);
-  return { d, domW: Math.round(((SCREEN_W * BOOTH_SCALE) / visibleW) * width) };
-}
-
-/** Walk up to the booth: start a step back and a little high, settle level with the screen. */
-export function BoothRig({ cam, active, reducedMotion }: {
-  cam: React.RefObject<THREE.PerspectiveCamera | null>; active: boolean; reducedMotion: boolean;
-}) {
-  const { size } = useThree();
-  const entered = useRef(false);
-  const goal = useMemo(() => new THREE.Vector3(), []);
-  const look = useMemo(() => SCREEN_CENTRE.clone().setY(VIEW_Y * BOOTH_SCALE), []);
-  useFrame((state, dt) => {
-    const camera = cam.current;
-    if (!camera) return;
-    if (!active) { entered.current = false; return; }
-    const { d } = boothView(size.width, size.height);
-    goal.copy(SCREEN_CENTRE).addScaledVector(BOOTH_FWD, d).setY(VIEW_Y * BOOTH_SCALE);
-    if (!reducedMotion) {
-      goal.x += state.pointer.x * 0.05;
-      goal.y += state.pointer.y * 0.03;
-    }
-    if (!entered.current) {
-      entered.current = true;
-      camera.position.copy(goal).addScaledVector(BOOTH_FWD, reducedMotion ? 0 : 1.4 * BOOTH_SCALE).setY(reducedMotion ? goal.y : 2.16 * BOOTH_SCALE);
-    }
-    camera.position.lerp(goal, reducedMotion ? 1 : 1 - Math.exp(-dt * 2.2));
-    camera.lookAt(look);
-  });
-  return null;
-}
 
 /* ── canvas art: the sign, the poster, the resting screen, the print ─── */
 
@@ -241,7 +193,7 @@ function useBoothArt(fontsReady: boolean) {
 
       g.fillStyle = ART.blue;
       g.font = `400 13px ${f.mono}`;
-      tracked(g, "TOUCH THE SCREEN", 256, 610, 2.6);
+      tracked(g, "STEP UP · TAP TO BEGIN", 256, 610, 2.2);
 
       g.fillStyle = "rgba(32,37,42,0.55)";
       g.font = `400 11px ${f.mono}`;
@@ -293,7 +245,7 @@ function useBoothArt(fontsReady: boolean) {
 
       g.fillStyle = "rgba(245,236,223,0.82)";
       g.font = `400 13px ${f.mono}`;
-      tracked(g, "TOUCH TO BEGIN", 256, 296, 3.2);
+      tracked(g, "PRESS TO BEGIN", 256, 296, 3.2);
       g.fillStyle = ART.cyan;
       g.beginPath();
       g.moveTo(248, 316);
@@ -607,9 +559,7 @@ function Ari({ reducedMotion }: { reducedMotion: boolean }) {
   );
 }
 
-export function Booth({ boothMode, screen, flashKey, phase, reducedMotion }: {
-  boothMode: boolean; screen?: (width: number) => ReactNode; flashKey: number; phase: Phase; reducedMotion: boolean;
-}) {
+export function Booth({ phase, reducedMotion }: { phase: Phase; reducedMotion: boolean }) {
   const [fontsReady, setFontsReady] = useState(false);
   useEffect(() => {
     let live = true;
@@ -617,34 +567,14 @@ export function Booth({ boothMode, screen, flashKey, phase, reducedMotion }: {
     return () => { live = false; };
   }, []);
 
-  // drei's <Html> binds to the canvas parent and moves when R3F connects its events, a moment after the canvas's
-  // first commit. Mounted in that same commit, it is briefly re-targeted, and the old root's unmount lands on the
-  // new one: the screen goes blank. A frame later the target has settled, whether we arrived by click or by a link.
-  const [screenReady, setScreenReady] = useState(false);
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setScreenReady(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
-
   const art = useBoothArt(fontsReady);
   const mats = useMaterials();
   const body = useGeometry(ARCH_W, ARCH_SPRING, ARCH_BASE, 0.84, 0.014);
   const inlay = useGeometry(1.04, 1.56, 0.16, 0.012, 0);
-  const { size } = useThree();
-  const { domW } = boothView(size.width, size.height);
 
   const warm = useRef<THREE.PointLight>(null);
-  const flash = useRef<THREE.PointLight>(null);
-  const strip = useRef<THREE.MeshStandardMaterial>(null);
-  const firedAt = useRef<number | null>(null);
-  const lastKey = useRef(flashKey);
 
   useFrame((_, dt) => {
-    if (flashKey !== lastKey.current) { lastKey.current = flashKey; firedAt.current = now(); }
-    const age = firedAt.current === null ? 99 : now() - firedAt.current;
-    const burst = Math.exp(-age * 11);
-    if (flash.current) flash.current.intensity = 70 * burst;
-    if (strip.current) strip.current.emissiveIntensity = 0.18 + 7 * burst;
     if (warm.current) {
       const target = phase === "night" ? 4.6 : phase === "evening" ? 3.0 : phase === "morning" ? 1.5 : 1.0;
       warm.current.intensity += (target - warm.current.intensity) * (1 - Math.exp(-dt * 2));
@@ -695,18 +625,10 @@ export function Booth({ boothMode, screen, flashKey, phase, reducedMotion }: {
         <planeGeometry args={[SCREEN_W, SCREEN_H]} />
         <meshStandardMaterial color={c.boothInk} roughness={0.5} />
       </mesh>
-      {screen && screenReady ? (
-        <Html transform distanceFactor={(SCREEN_W * 400) / domW} position={[0, SCREEN_Y, 0.513]} zIndexRange={[20, 0]}>
-          <div style={{ position: "absolute", top: 0, left: 0, width: domW, height: Math.round(domW * 0.7), transform: "translate(-50%, -50%)" }}>
-            {screen(domW)}
-          </div>
-        </Html>
-      ) : (
-        <mesh position={[0, SCREEN_Y, 0.513]}>
-          <planeGeometry args={[SCREEN_W, SCREEN_H]} />
-          <meshStandardMaterial map={art.rest} emissive="#ffffff" emissiveMap={art.rest} emissiveIntensity={0.8} roughness={0.45} />
-        </mesh>
-      )}
+      <mesh position={[0, SCREEN_Y, 0.513]}>
+        <planeGeometry args={[SCREEN_W, SCREEN_H]} />
+        <meshStandardMaterial map={art.rest} emissive="#ffffff" emissiveMap={art.rest} emissiveIntensity={0.8} roughness={0.45} />
+      </mesh>
 
       {/* camera bar, lens, flash diffuser */}
       <RoundedBox args={[0.54, 0.18, 0.07]} radius={0.03} smoothness={3} position={[0, 1.82, 0.483]} material={mats.cream} />
@@ -727,7 +649,7 @@ export function Booth({ boothMode, screen, flashKey, phase, reducedMotion }: {
       <Box size={[0.21, 0.105, 0.012]} position={[0.12, 1.82, 0.522]} color="#2a2119" />
       <mesh position={[0.12, 1.82, 0.531]}>
         <boxGeometry args={[0.19, 0.088, 0.01]} />
-        <meshStandardMaterial ref={strip} color="#f6cd95" emissive="#ffd7a2" emissiveIntensity={0.22} roughness={0.42} />
+        <meshStandardMaterial color="#f6cd95" emissive="#ffd7a2" emissiveIntensity={0.22} roughness={0.42} />
       </mesh>
       {[-0.064, -0.021, 0.021, 0.064].map((dx) => (
         <Box key={dx} size={[0.004, 0.084, 0.006]} position={[0.12 + dx, 1.82, 0.5375]} color="#6d4a28" />
@@ -736,7 +658,6 @@ export function Booth({ boothMode, screen, flashKey, phase, reducedMotion }: {
         <circleGeometry args={[0.0065, 12]} />
         <meshBasicMaterial color={c.boothHalo} toneMapped={false} />
       </mesh>
-      <pointLight ref={flash} position={[0, 1.95, 1.05]} color="#fff6e8" intensity={0} distance={6 * BOOTH_SCALE} decay={1.5} />
 
       {/* crown sign */}
       <Box size={[0.64, 0.14, 0.016]} position={[0, 2.005, 0.456]} color={c.boothBrass} />
@@ -775,74 +696,5 @@ export function Booth({ boothMode, screen, flashKey, phase, reducedMotion }: {
       <pointLight ref={warm} position={[0, 2.05, 0.95]} color="#ffcf9e" intensity={1} distance={3.6 * BOOTH_SCALE} decay={1.7} />
       <pointLight position={[0, SCREEN_Y, 1.05]} color={c.boothHalo} intensity={0.55} distance={1.5 * BOOTH_SCALE} decay={2} />
     </group>
-  );
-}
-
-/** The print: feeds down out of the slot, then lifts up to eye level and turns to face you. */
-export function PrintedCard({ url, cam, reducedMotion, onLift, onPresented }: {
-  url: string; cam: React.RefObject<THREE.PerspectiveCamera | null>; reducedMotion: boolean; onLift: () => void; onPresented: () => void;
-}) {
-  const CW = 0.26;
-  const CH = CW * (1330 / 900);
-  const tex = useMemo(() => { const t = new THREE.TextureLoader().load(url); t.colorSpace = THREE.SRGBColorSpace; return t; }, [url]);
-  const geo = useMemo(() => new THREE.PlaneGeometry(CW, CH).translate(0, -CH / 2, 0), [CH]);
-  const ref = useRef<THREE.Mesh>(null);
-  const born = useRef<number | null>(null);
-  const lifted = useRef(false);
-  const shown = useRef(false);
-  const { size } = useThree();
-  const slotQuat = useMemo(() => new THREE.Quaternion().setFromEuler(new THREE.Euler(0.1, BOOTH_ROT, 0, "YXZ")), []);
-  const from = useMemo(() => new THREE.Vector3(), []);
-  const to = useMemo(() => new THREE.Vector3(), []);
-  const camQuat = useMemo(() => new THREE.Quaternion(), []);
-  const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
-
-  useEffect(() => () => { tex.dispose(); geo.dispose(); }, [tex, geo]);
-
-  useFrame((state) => {
-    const m = ref.current;
-    const camera = cam.current;
-    if (!m || !camera) return;
-    if (born.current === null) born.current = now();
-    const age = now() - born.current;
-    const FEED = reducedMotion ? 0 : 1.7;
-    const PAUSE = reducedMotion ? 0 : 0.35;
-    const LIFT = reducedMotion ? 0 : 1.1;
-
-    const t = Math.tan(THREE.MathUtils.degToRad(BOOTH_FOV / 2));
-    const dist = 0.95;
-    const visH = 2 * dist * t;
-    const visW = visH * (size.width / size.height);
-    const scale = Math.min((0.62 * visH) / CH, (0.8 * visW) / CW);
-    camera.getWorldDirection(to);
-    to.multiplyScalar(dist).add(camera.position);
-    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
-    to.addScaledVector(up, (CH * scale) / 2 + visH * 0.04);
-    camQuat.copy(camera.quaternion);
-
-    if (age < FEED) {
-      m.position.copy(SLOT);
-      m.quaternion.copy(slotQuat);
-      m.scale.set(1, Math.max(0.001, age / FEED), 1);
-    } else if (age < FEED + PAUSE) {
-      m.scale.set(1, 1, 1);
-    } else {
-      if (!lifted.current) { lifted.current = true; from.copy(m.position); onLift(); }
-      const p = LIFT === 0 ? 1 : Math.min(1, (age - FEED - PAUSE) / LIFT);
-      const e = ease(p);
-      m.position.lerpVectors(from, to, e);
-      m.position.y += Math.sin(p * Math.PI) * 0.12;
-      m.quaternion.slerpQuaternions(slotQuat, camQuat, e);
-      const sc = 1 + (scale - 1) * e;
-      m.scale.set(sc, sc, sc);
-      if (p >= 1 && !shown.current) { shown.current = true; onPresented(); }
-      if (p >= 1 && !reducedMotion) m.position.addScaledVector(up, Math.sin(state.clock.elapsedTime * 1.4) * 0.004);
-    }
-  });
-
-  return (
-    <mesh ref={ref} geometry={geo} renderOrder={10}>
-      <meshStandardMaterial map={tex} emissive="#ffffff" emissiveMap={tex} emissiveIntensity={0.55} roughness={0.45} side={THREE.DoubleSide} />
-    </mesh>
   );
 }
