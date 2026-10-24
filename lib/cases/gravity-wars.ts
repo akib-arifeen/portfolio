@@ -6,7 +6,7 @@ const work: Work = {
   kicker: "Personal project · 2026",
   summary:
     "A browser gravity brawler. Endless is the default: eat debris, absorb smaller rivals, slingshot around stars and climb a live top ten while bots of varied skill drop in and out. Entirely offline.",
-  role: "Rebuilt the game: simulation, bots, rendering, sound, controls and tests",
+  role: "I rebuilt the game: simulation, bots, rendering, sound, controls and tests",
   when: "Rebuilt October 2026",
   stack: ["TypeScript", "Canvas 2D", "Web Audio", "React 19", "Next.js 15.5 static export", "Vitest"],
   status: "shipped",
@@ -64,7 +64,7 @@ const work: Work = {
     },
     {
       kind: "steps",
-      heading: "What Phase A adds",
+      heading: "What the rebuild adds",
       items: [
         { title: "Gravity as a weapon", body: "Dash to escape or lunge, repulse to shove a rival into a star, and a singularity ultimate that turns you into a temporary black hole. A clean slingshot releases a speed burst." },
         { title: "A living arena", body: "Six announced cosmic events, from meteor showers to a pulsar beam, across five arenas: Classic, Binary, The Maw, Nebula Field and The Belt." },
@@ -82,7 +82,7 @@ const work: Work = {
     },
     {
       kind: "decisions",
-      heading: "Decisions I would defend",
+      heading: "The calls I would defend",
       items: [
         {
           choice: "Check the physics against an independent reference",
@@ -117,7 +117,7 @@ const work: Work = {
       kind: "prose",
       heading: "What is still open",
       paras: [
-        "The leaderboard is local because the game has no server; a global board and multiplayer are Phase C. The original timed round is kept alongside Endless for players who want a finish line.",
+        "The leaderboard is local because the game has no server; a global board and multiplayer are Phase C. A campaign with bosses, a daily challenge and share cards is the next layer and is not in this build. The original timed round is kept alongside Endless for players who want a finish line.",
       ],
     },
   ],

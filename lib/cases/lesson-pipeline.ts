@@ -5,8 +5,8 @@ const work: Work = {
   title: "AI lesson pipeline",
   kicker: "See Change Education · 2026",
   summary:
-    "A pipeline that turns recorded classes, videos and documents into complete interactive lessons, with video, bilingual subtitles and speaking tasks, and a teacher reviewing each one before it is published.",
-  role: "The pipeline, the NotebookLM tool client and server, the bulk workflow and the review step",
+    "I built a pipeline that turns recorded classes, videos and documents into complete interactive lessons, with video, bilingual subtitles and speaking tasks, and a teacher reviewing each one before it is published.",
+  role: "I built the pipeline, the NotebookLM tool client and server, the bulk workflow and the review step",
   when: "2026",
   stack: ["Spring Boot", "MyBatis-Plus", "Redis", "React", "NotebookLM (MCP)", "Azure OpenAI", "Whisper", "FFmpeg"],
   status: "in production",
@@ -22,9 +22,16 @@ const work: Work = {
   blocks: [
     {
       kind: "prose",
-      heading: "The ask and what it became",
+      heading: "What I wanted to build",
       paras: [
         "The ask was to make videos from lessons. Nobody gave me a spec, so I built the whole route: a class recording goes in, and a reviewed lesson comes out with its video, subtitles, quizzes and speaking tasks. Lessons are produced in bulk through a produce, review and publish workflow.",
+        "The bit I cared about most was the last step. A generated lesson can be wrong, so a person checks each scene and nothing goes live without approval.",
+      ],
+    },
+    {
+      kind: "prose",
+      heading: "What actually happened",
+      paras: [
         "The video step uses NotebookLM through its tool protocol (MCP). I deployed the server on a cloud machine, signed in over SSH because the machine has no screen, and kept the sessions alive with scheduled jobs. On the Java side I wrote the protocol client by hand.",
         "By hand, a lesson takes roughly two working days. With the pipeline it takes a few hours, most of it a teacher checking and fixing the result. That works out to about 80% less time per lesson, and it is an estimate, not a measurement.",
       ],
@@ -104,7 +111,7 @@ const work: Work = {
     },
     {
       kind: "decisions",
-      heading: "Decisions I would defend",
+      heading: "The calls I would defend",
       items: [
         {
           choice: "Write the MCP client by hand",
@@ -121,6 +128,30 @@ const work: Work = {
           why: "When a video narrated about its own outline instead of teaching, the fix went in as a versioned migration that can be re-run safely. I ported the base prompt from a colleague's original and wrote the fixes.",
           cost: "Every prompt change is a migration to write and review, not a quick edit.",
         },
+      ],
+    },
+    {
+      kind: "prose",
+      heading: "What broke",
+      paras: [
+        "A video narrated about its own outline instead of teaching. Nothing about the pipeline was wrong, the prompt was, so the fix went in as a versioned migration that can be re-run safely. I ported the base prompt from a colleague's original and wrote the fixes.",
+        "The other break was quieter. A protocol session is not thread-safe, so each generation opens a fresh one and closes it. That is the cost of writing the client by hand, and I pay it on every single lesson.",
+      ],
+    },
+    {
+      kind: "prose",
+      heading: "What I learned",
+      paras: [
+        "To ask the server what it can do instead of guessing names from documentation that might describe another build. Writing the client by hand is what made that possible, and it is the reason the pipeline has not broken because a tool was renamed under it.",
+        "That the teacher is not a rubber stamp. Review is where the remaining time goes, about 1 to 2 hours of each lesson's 2 to 3, and the scene-by-scene page exists because that is the shape the work actually takes.",
+      ],
+    },
+    {
+      kind: "prose",
+      heading: "What I would do differently",
+      paras: [
+        "I would version the prompts from the first day. Every prompt change is a migration to write and review, not a quick edit, and starting that way would have saved me the awkwardness of retrofitting it after something went wrong.",
+        "I would also measure the time per lesson properly instead of estimating it. The saving I quote is honest, but it is an estimate, and I would rather put a number in front of a teacher that I can defend.",
       ],
     },
     {

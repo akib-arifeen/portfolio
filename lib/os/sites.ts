@@ -1,5 +1,5 @@
 // Browser bookmarks: the live projects. Each `embeddable` flag is verified with `curl -sIL` (no X-Frame-Options / frame-ancestors). Worker-owned data.
-// Checked 2026-10-22: the five project sites return 200 with no X-Frame-Options and no CSP; github.com returns X-Frame-Options: deny and frame-ancestors 'none'.
+// Checked 2026-10-23: every project site returns 200 with no X-Frame-Options and no CSP; github.com returns X-Frame-Options: deny and frame-ancestors 'none'.
 import type { Site } from "./types";
 
 export const sites: Site[] = [
@@ -34,6 +34,14 @@ export const sites: Site[] = [
     embeddable: true,
     blurb: "A browser gravity brawler. Play bots on three difficulty levels, offline.",
     workSlug: "gravity-wars",
+  },
+  {
+    id: "save-your-princess",
+    title: "Save Your Princess",
+    url: "https://syp-playtest.vercel.app/?slice=1",
+    embeddable: true,
+    blurb: "A 3D narrative game in development. This slice: mend broken windows in a dream castle and watch the light answer you.",
+    workSlug: "save-your-princess",
   },
   {
     id: "culinary-companion",

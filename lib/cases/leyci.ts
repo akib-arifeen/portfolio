@@ -6,7 +6,7 @@ const work: Work = {
   kicker: "Self-initiated concept · July 2026",
   summary:
     "From an Instagram account to a live bilingual storefront in about a day: a self-initiated concept for a Hong Kong womenswear label.",
-  role: "Research, bilingual copy, storefront, admin, product films and deployment",
+  role: "I did the research, the bilingual copy, the storefront, the admin, the product films and the deployment",
   when: "25 to 26 July 2026",
   stack: ["Astro", "Cloudflare Pages", "Cloudflare D1", "GSAP", "Image-to-video AI"],
   status: "concept",
@@ -26,7 +26,7 @@ const work: Work = {
       paras: [
         "This is a self-initiated concept. Nobody asked for it. I took a Hong Kong womenswear label's Instagram feed and turned it into a working online shop in about a day, to show what the brand could look like online.",
         "I started from the label's own Instagram archive. This page shows none of its photographs, because they belong to the label.",
-        "The storefront is live as a demo.",
+        "The storefront is live as a demo. It was redeployed in October with the polish pass: desktop wheel scrolling is smoothed with Lenis, and every editorial photo and poster uses one corner radius.",
       ],
     },
     {
@@ -42,7 +42,7 @@ const work: Work = {
     },
     {
       kind: "decisions",
-      heading: "Decisions I would defend",
+      heading: "The calls I would defend",
       items: [
         {
           choice: "Server-rendered, not a static build",
