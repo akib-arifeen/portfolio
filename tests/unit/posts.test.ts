@@ -294,4 +294,18 @@ describe("evidence guards", () => {
     expect(booth).toMatch(/binds to loopback by default/);
     expect(booth).not.toMatch(/loopback only/i);
   });
+
+  it("keeps the unverified queue internals and ownership split out", () => {
+    const queue = copyOf("the-queue-that-waits-for-ram");
+    expect(queue, "status check sits inside the UPDATE").not.toMatch(/inside the UPDATE/i);
+    expect(queue, "compare-and-swap").not.toMatch(/compare-and-swap/i);
+    expect(queue, "backend half").not.toMatch(/backend half/i);
+  });
+
+  it("drops the evaluative closers that no record supports", () => {
+    expect(copyOf("the-room-had-no-bright-pixels"), "nowhere else").not.toMatch(/nowhere else/i);
+    expect(copyOf("when-the-photo-booth-had-to-just-work"), "part that mattered").not.toMatch(
+      /part that mattered/i,
+    );
+  });
 });
