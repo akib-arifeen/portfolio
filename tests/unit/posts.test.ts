@@ -133,3 +133,113 @@ describe("formatPostDate", () => {
     expect(formatPostDate("2026-01-01")).toBe("1 January 2026");
   });
 });
+
+/** Every string a reader can see on a post: title, summary, headings and block text. */
+const visibleCopy = (p: Post): string[] => {
+  const out: string[] = [p.title, p.summary];
+  for (const b of p.blocks) {
+    if (b.heading) out.push(b.heading);
+    switch (b.kind) {
+      case "prose":
+        out.push(...b.paras);
+        break;
+      case "steps":
+        for (const i of b.items) out.push(i.title, i.body);
+        break;
+      case "decisions":
+        for (const i of b.items) out.push(i.choice, i.why, i.cost);
+        break;
+      case "facts":
+        for (const i of b.items) out.push(i.value, i.label, i.note ?? "");
+        break;
+      case "media":
+        for (const i of b.items) out.push(i.kind === "image" ? i.alt : "", i.caption ?? "");
+        break;
+      case "code":
+        out.push(b.caption, b.source);
+        break;
+    }
+  }
+  return out;
+};
+
+const copyOf = (slug: string): string => {
+  const p = getPost(slug);
+  expect(p, slug).toBeDefined();
+  return visibleCopy(p as Post).join("\n");
+};
+
+/** Prose paragraphs only, which is where the essay itself lives. */
+const bodyOf = (p: Post): string =>
+  p.blocks.flatMap((b) => (b.kind === "prose" ? b.paras : [])).join(" ");
+
+const wordCount = (s: string): number => s.split(/\s+/).filter((w) => w.length > 0).length;
+
+const GENERIC_CASE_HEADINGS = ["What I learned", "What I would do differently", "What broke"];
+
+describe("editorial invariants", () => {
+  it("uses no em dash, en dash or emoji in visible copy", () => {
+    const dash = /[\u2013\u2014]/;
+    const emoji = /\p{Extended_Pictographic}/u;
+    const variationSelector = /\uFE0F/;
+    for (const p of published()) {
+      for (const s of visibleCopy(p)) {
+        expect(dash.test(s), `${p.slug}: ${s}`).toBe(false);
+        expect(emoji.test(s), `${p.slug}: ${s}`).toBe(false);
+        expect(variationSelector.test(s), `${p.slug}: ${s}`).toBe(false);
+      }
+    }
+  });
+
+  it("leaves no scaffolding copy", () => {
+    for (const p of published()) {
+      const all = visibleCopy(p).join("\n");
+      expect(all, p.slug).not.toMatch(/scaffolding/i);
+      expect(all, p.slug).not.toMatch(/Task [13]/);
+    }
+  });
+
+  it("runs between 350 and 550 words of body copy", () => {
+    for (const p of published()) {
+      const n = wordCount(bodyOf(p));
+      expect(n, `${p.slug}: ${n} words`).toBeGreaterThanOrEqual(350);
+      expect(n, `${p.slug}: ${n} words`).toBeLessThanOrEqual(550);
+    }
+  });
+
+  it("does not reuse the generic case-study headings", () => {
+    for (const p of published()) {
+      const headings = p.blocks.map((b) => b.heading).filter((h): h is string => Boolean(h));
+      for (const h of headings) expect(GENERIC_CASE_HEADINGS, `${p.slug}: ${h}`).not.toContain(h);
+    }
+  });
+
+  it("keeps the SYP measurements in the SYP essay only", () => {
+    const syp = copyOf("the-room-had-no-bright-pixels");
+    for (const value of ["0.00%", "2.73%", "237"]) expect(syp, value).toContain(value);
+    expect(syp).toMatch(/\b76\b/);
+
+    for (const slug of ["the-queue-that-waits-for-ram", "when-the-photo-booth-had-to-just-work"]) {
+      const other = copyOf(slug);
+      for (const value of ["0.00%", "2.73%", "237"]) expect(other, `${slug}: ${value}`).not.toContain(value);
+      expect(other, `${slug}: p99`).not.toMatch(/p99/);
+      expect(other, `${slug}: 76`).not.toMatch(/\b76\b/);
+    }
+  });
+
+  it("gives the queue essay no queue metric and no speedup figure", () => {
+    const queue = copyOf("the-queue-that-waits-for-ram");
+    expect(queue).not.toMatch(/433/);
+    expect(queue).not.toMatch(/\b99\s*s\b/);
+    expect(queue).not.toMatch(/%/);
+    expect(queue).not.toMatch(/faster|speedup|speed-up/i);
+  });
+
+  it("states the photo booth attendance as the recorded range", () => {
+    const booth = copyOf("when-the-photo-booth-had-to-just-work");
+    expect(booth).toContain("200-300");
+    // "200-300 guests" is the range; a bare "300 guests" would be the precise claim the record does not support.
+    expect(booth).not.toMatch(/(?<!-)300 guests/);
+    expect(booth).not.toMatch(/300-person|exactly 300/i);
+  });
+});
