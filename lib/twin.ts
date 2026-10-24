@@ -30,7 +30,7 @@ export type TwinAnswer = {
 
 // Only published case studies get a button; a draft would be a 404.
 const readCase = (slug: string): TwinEntry["action"] =>
-  getWork(slug) ? { label: "Read the case study", run: { type: "href", href: `/work/${slug}` } } : undefined;
+  getWork(slug) ? { label: "Read the case study", run: { type: "href", href: `/blog/${slug}` } } : undefined;
 
 /** The curated entries (>= 30), written only from WORK_RECORD.md, the CV and PORTFOLIO_PLAN.md §14. */
 export const entries: TwinEntry[] = [

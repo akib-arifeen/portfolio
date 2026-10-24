@@ -135,7 +135,7 @@ export default function Browser({ win }: AppProps) {
             </li>
           ))}
           <li>
-            <button type="button" className="br-tile" onClick={() => os.run({ type: "href", href: "/work" })}>
+            <button type="button" className="br-tile" onClick={() => os.run({ type: "href", href: "/blog" })}>
               <span className="br-mark" style={tileStyle(sites.length)} aria-hidden="true">CS</span>
               <span className="br-ttl">Case studies</span>
               <span className="br-blurb">How each project was built, with the real code.</span>

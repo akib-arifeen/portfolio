@@ -12,7 +12,7 @@ const HEADINGS: Record<SearchKind, string> = {
 const SUGGESTIONS: SearchItem[] = [
   { id: "suggest:projects", kind: "project", title: "Projects", subtitle: "Folder", action: { type: "open", app: "files", arg: { path: "/Users/akib/Projects" } } },
   { id: "suggest:gravity-wars", kind: "project", title: "Gravity Wars", subtitle: "Playground", action: { type: "open", app: "playground", arg: { game: "gravity-wars" } } },
-  { id: "suggest:work", kind: "page", title: "All work", subtitle: "Case studies", action: { type: "href", href: "/work" } },
+  { id: "suggest:work", kind: "page", title: "All work", subtitle: "Case studies", action: { type: "href", href: "/blog" } },
   { id: "suggest:neofetch", kind: "command", title: "neofetch", action: { type: "open", app: "terminal", arg: { command: "neofetch" } } },
   { id: "suggest:mail", kind: "app", title: "Mail", subtitle: "Write to me", action: { type: "open", app: "mail" } },
 ];

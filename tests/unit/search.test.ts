@@ -240,7 +240,7 @@ describe("buildIndex: shape", () => {
 
   it("each published case-study slug is reachable through exactly one item", () => {
     for (const w of allWorks()) {
-      const hits = index.filter((i) => i.action.type === "href" && i.action.href === `/work/${w.slug}`);
+      const hits = index.filter((i) => i.action.type === "href" && i.action.href === `/blog/${w.slug}`);
       expect(hits.map((h) => h.id), w.slug).toHaveLength(1);
     }
   });
@@ -269,21 +269,21 @@ describe("buildIndex: shape", () => {
       else expect((p.action as { newTab?: boolean }).newTab, p.id).toBeFalsy();
     }
     expect(index.find((i) => i.id === "page:home")?.action).toEqual({ type: "href", href: "/" });
-    expect(index.find((i) => i.id === "page:work")?.action).toEqual({ type: "href", href: "/work" });
+    expect(index.find((i) => i.id === "page:work")?.action).toEqual({ type: "href", href: "/blog" });
   });
 
-  it("project folders with a published case study open /work/<slug>", () => {
+  it("project folders with a published case study open /blog/<slug>", () => {
     for (const [folder, slug] of Object.entries(FOLDER_SLUG)) {
       if (!getWork(slug)) continue;
       const hit = index.find((i) => i.kind === "project" && i.subtitle === "Project" && i.title === folder);
       expect(hit, folder).toBeDefined();
-      expect(hit!.action, folder).toEqual({ type: "href", href: `/work/${slug}` });
+      expect(hit!.action, folder).toEqual({ type: "href", href: `/blog/${slug}` });
     }
   });
 
-  it("the Leyci folder maps to /work/leyci", () => {
+  it("the Leyci folder maps to /blog/leyci", () => {
     const hit = index.find((i) => i.kind === "project" && i.title === "Léyci storefront" && i.subtitle === "Project");
-    expect(hit?.action).toEqual({ type: "href", href: "/work/leyci" });
+    expect(hit?.action).toEqual({ type: "href", href: "/blog/leyci" });
   });
 
   it("project folders without a published case study open Files at their path", () => {
@@ -395,7 +395,7 @@ describe("buildIndex: stack keywords and command subtitles", () => {
     const linked = index.filter((i) => i.kind === "project" && i.subtitle === "Project" && i.action.type === "href");
     expect(linked.length).toBeGreaterThan(0);
     for (const p of linked) {
-      const slug = (p.action as { href: string }).href.replace("/work/", "");
+      const slug = (p.action as { href: string }).href.replace("/blog/", "");
       const work = getWork(slug)!;
       expect(work, slug).toBeDefined();
       for (const tech of work.stack) expect(p.keywords ?? [], `${p.title}: ${tech}`).toContain(tech);

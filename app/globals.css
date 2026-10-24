@@ -155,10 +155,15 @@ a { color: inherit; }
 }
 .chip[aria-pressed="true"] { background: var(--color-ink); color: var(--color-paper-2); border-color: var(--color-ink); }
 .chip:active { transform: scale(0.97); }
-@media (pointer: coarse) { .chip { min-height: 44px; } }
-/* Nav links are the smallest targets on the site; give them a full touch height without widening the pill. */
 @media (pointer: coarse) {
-  .wordmark, .nav__link { display: inline-flex; align-items: center; min-height: 44px; }
+  .chip { min-height: 44px; }
+  .chip--icon { min-width: 44px; }
+}
+/* Nav links are the smallest targets on the site; give them a full 44px box in both directions.
+   Labels stay where they are: the pill grows, the type does not move. */
+@media (pointer: coarse) {
+  .wordmark, .nav__link { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; }
+  .nav__link { justify-content: center; }
 }
 .chip:disabled { opacity: 0.45; cursor: not-allowed; }
 @media (hover: hover) and (pointer: fine) {
@@ -646,6 +651,10 @@ a { color: inherit; }
 .letter__links { display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-lg); }
 .letter__links a { display: inline-block; padding-block: 12px; white-space: nowrap; text-underline-offset: 0.2em; text-decoration-color: var(--color-rule); }
 @media (hover: hover) and (pointer: fine) { .letter__links a:hover { color: var(--color-ink); text-decoration-color: var(--color-ink); } }
+/* Short labels ("Profile", "GitHub") are under 44px wide; centre them in a full target. */
+@media (pointer: coarse) {
+  .letter__links a { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; }
+}
 
 /* Entrance — one orchestrated moment: the copy settles as the lamp comes on */
 .reveal { animation: reveal var(--dur-long) var(--ease-out) both; animation-delay: 300ms; }

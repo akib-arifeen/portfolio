@@ -69,7 +69,7 @@ export default function Playground({ win }: AppProps) {
         <h2 className="pg-title">{item.name}</h2>
         <span className="pg-badge" data-status={item.status}>{STATUS[item.status]}</span>
         {item.url && <button type="button" className="pg-btn" onClick={() => openNewTab(item.url!)}>Open in new tab</button>}
-        {item.workSlug && getWork(item.workSlug) && <button type="button" className="pg-btn" onClick={() => os.run({ type: "href", href: `/work/${item.workSlug}` })}>Case study</button>}
+        {item.workSlug && getWork(item.workSlug) && <button type="button" className="pg-btn" onClick={() => os.run({ type: "href", href: `/blog/${item.workSlug}` })}>Case study</button>}
       </div>
       <div className="pg-stage">
         {canRun ? (

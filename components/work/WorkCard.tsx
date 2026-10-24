@@ -6,7 +6,7 @@ export function WorkCard({ work, headingLevel = 2, featured = false }: { work: W
   const H = headingLevel === 2 ? "h2" : "h3";
   return (
     <article className={featured ? "wcard wcard--featured" : "wcard"}>
-      <Link href={`/work/${work.slug}`} className="wcard__link">
+      <Link href={`/blog/${work.slug}`} className="wcard__link">
         <div className="wcard__cover">
           <MediaItem item={{ ...work.cover, caption: undefined }} />
         </div>
