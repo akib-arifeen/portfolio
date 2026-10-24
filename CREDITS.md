@@ -30,6 +30,9 @@ The work samples in `public/work` and the studio monitor loop in `public/studio`
 ### Music in the studio media
 - "Glitter Blast" by Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 (https://creativecommons.org/licenses/by/4.0/). It plays under the ARI "Let's go" opener (public/work/video-studio/letsgo.mp4 and public/sound/ari-lets-go.m4a).
 
+### The photobooth
+The ARI photo-booth identity — the mascot, the "Say Cheese with ARI" booth, and its blue/cyan palette — is from my work at See Change Education. The 3D booth, its sign, poster, screens and print strip in this site are original recreations built from geometry and canvas-drawn artwork; no image assets from that project are used or included. "Booth 004" is a nod to the booth's own label, not a performance figure.
+
 ## Original work
 
 All icons, the wallpaper, the "a" monogram and the 3D room are original and made for this site. No Apple icons, wallpapers, logos or fonts are used.

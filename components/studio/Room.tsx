@@ -50,10 +50,13 @@ function useFloorTexture() {
     g.fillStyle = c.floor;
     g.fillRect(0, 0, 256, 256);
     for (let i = 0; i < 8; i++) {
-      g.fillStyle = i % 2 ? "rgba(90,60,30,0.06)" : "rgba(255,240,220,0.05)";
+      g.fillStyle = i % 2 ? "rgba(20,14,8,0.16)" : "rgba(255,220,180,0.035)";
       g.fillRect(0, i * 32, 256, 32);
-      g.fillStyle = "rgba(70,45,25,0.18)";
+      g.fillStyle = "rgba(12,9,6,0.34)";
       g.fillRect(0, i * 32, 256, 1.5);
+      // a few grain lines per board so the dark floor keeps some texture
+      g.fillStyle = "rgba(255,220,180,0.025)";
+      for (let j = 0; j < 3; j++) g.fillRect((i * 53 + j * 71) % 256, i * 32 + 8 + j * 7, 40, 1);
     }
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
@@ -84,6 +87,12 @@ export function Room({ sky }: { sky: string }) {
       <Box size={[0.2, 3.8, 6.4]} position={[-3.2, 1.9, -0.1]} color={c.wallSide} cast={false} />
       <Box size={[6.2, 0.14, 0.06]} position={[0, 0.1, -3.08]} color={c.trim} cast={false} />
       <Box size={[0.06, 0.14, 6.2]} position={[-3.08, 0.1, 0]} color={c.trim} cast={false} />
+      {/* picture rail and two panel seams give the wall some architecture without another light */}
+      <Box size={[6.2, 0.05, 0.03]} position={[0, 2.92, -3.08]} color={c.trim} cast={false} />
+      <Box size={[0.03, 0.05, 6.2]} position={[-3.08, 2.92, 0]} color={c.trim} cast={false} />
+      {[-1.55, -0.05].map((z) => (
+        <Box key={z} size={[0.025, 2.82, 0.02]} position={[-3.09, 1.51, z]} color={c.wallSide} cast={false} />
+      ))}
 
       {/* window on the left wall — the sky follows the visitor's local time */}
       <mesh position={[-3.085, 2.15, 0.9]} rotation={[0, Math.PI / 2, 0]}>
@@ -103,10 +112,10 @@ export function Room({ sky }: { sky: string }) {
         <Box key={`${x}${z}`} size={[0.08, 0.95, 0.08]} position={[x, 0.5, z]} color={c.deskLeg} />
       ))}
 
-      {/* stool */}
-      <Cyl r={0.34} h={0.08} position={[-0.6, 0.66, -1.55]} color={c.stool} cast />
-      <Cyl r={0.05} h={0.62} position={[-0.6, 0.33, -1.55]} color={c.metal} segments={8} />
-      <Cyl r={0.3} h={0.04} position={[-0.6, 0.04, -1.55]} color={c.metal} />
+      {/* stool — tucked at the desk, where he actually sits */}
+      <Cyl r={0.34} h={0.08} position={[-0.6, 0.66, -1.88]} color={c.stool} cast />
+      <Cyl r={0.05} h={0.62} position={[-0.6, 0.33, -1.88]} color={c.metal} segments={8} />
+      <Cyl r={0.3} h={0.04} position={[-0.6, 0.04, -1.88]} color={c.metal} />
 
       {/* rug */}
       <Cyl r={1.55} h={0.02} position={[-0.3, 0.04, -0.6]} color={c.rug} segments={40} cast={false} />
