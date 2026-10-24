@@ -1,0 +1,1128 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>out of step</title><style>
+/* Accessibility only: 44px hit areas and a name for the scrub control. No layout change. */
+#pl { position: relative; }
+#pl::after { content: ""; position: absolute; inset: -12px -8px; }
+#sc { height: 44px; margin-block: -12px; }
+</style>
+</head><body>
+<script>window.FILM_FORMAT = { ar: '1:1' };</script>
+<script>
+'use strict';
+// ============================================================================
+// riso-canvas-film · core.js
+// Everything a film needs except the film itself. A film is one HTML file that loads this
+// script, defines props, scenes and a score, and calls defineFilm({...}).
+// Every frame is a pure function of (frame, seed). Every sound is computed too.
+//
+// Sections: CONFIG · UTILS · PRINT · HAND · PAPER · LETTERING · SOUND · RUNTIME
+// Do not edit per film. Copy it next to every film; `render.mjs --bundle` inlines it for delivery.
+//
+// The print model follows what Kevin Ngo's published pages actually do (see references/findings.md):
+// a halftone tile per ink and tone level, each ink's screen at its own angle through a pattern
+// transform, every plate a little out of register, inks composited with 'multiply', and every line
+// resampled and wobbled. Nothing here uses unseeded randomness, the date or the clock.
+// ============================================================================
+
+// ---- CONFIG ----------------------------------------------------------------
+// Set defaults BEFORE loading core.js if you need them at file scope, in their own script element:
+//   window.FILM_SEED = 3; window.FILM_FORMAT = { ar: '16:9' };
+// The query string always wins: ?s=9&ar=9:16&w=1920
+// (This file is inlined into a script element by render.mjs --bundle: never write a closing script tag in it, even in a comment.)
+const TAU = Math.PI * 2, SHORT = 1080;
+const qs = new URLSearchParams(location.search);
+const num = (v, d) => v !== null && v !== undefined && v !== '' && Number.isFinite(+v) ? +v : d;
+const SEED = num(qs.get('s'), num(window.FILM_SEED, 3));
+// Logical frame: the short side is always 1080 units. Scenes draw in these units and place things
+// relative to FW, FH, CX, CY. S scales logical units to output pixels (dots and lines included).
+let FW = SHORT, FH = SHORT, CX = SHORT / 2, CY = SHORT / 2, S = 1, OUT_W = SHORT, OUT_H = SHORT;
+function setFormat({ ar = '1:1', width } = {}) {
+  const [a, b] = String(ar).split(':').map(Number), r = a > 0 && b > 0 ? a / b : 1;
+  if (r >= 1) { FH = SHORT; FW = Math.round(SHORT * r); } else { FW = SHORT; FH = Math.round(SHORT / r); }
+  CX = FW / 2; CY = FH / 2;
+  OUT_W = Math.round(width || FW); OUT_W += OUT_W % 2; S = OUT_W / FW; OUT_H = Math.round(FH * S); OUT_H += OUT_H % 2;   // even sizes: libx264 needs them
+}
+setFormat({ ar: qs.get('ar') || (window.FILM_FORMAT && window.FILM_FORMAT.ar) || '1:1', width: num(qs.get('w'), window.FILM_FORMAT && window.FILM_FORMAT.width) });
+let FPS = 24, FRAMES = 0;
+const errors = [];
+const report = (label, e) => { const m = label + ': ' + ((e && e.stack) || e); if (!errors.includes(m) && errors.length < 50) errors.push(m); console.error(m); };
+// Unseeded randomness would make a frame depend on when it was drawn. Any call is recorded as a page error, which fails the render.
+Math.random = () => { report('unseeded randomness', new Error('the built-in random function was called: use streamOf(...keys) instead')); return .5; };   // @allow-banned-token
+// A film or a score must be a pure function of its seed. The static scan in the tools forbids the words, but a scan can
+// be got round (a line break inside the name defeated it), so the clocks are also replaced here: reading one is
+// reported as a page error, which fails the render, and returns a fixed value so nothing silently varies.
+const _clock = name => () => { report('wall clock', new Error('the ' + name + ' clock was read. Every frame and every sound must depend only on the seed, so a render made now and a render made tomorrow are the same file.')); return 0; };
+Date.now = _clock('Date.now');   // @allow-banned-token
+if (window.performance && performance.now) performance.now = _clock('performance.now');   // @allow-banned-token
+try { Object.defineProperty(performance, 'timeOrigin', { get: _clock('performance.timeOrigin'), configurable: true }); } catch (e) {}   // the same clock by another door (found by review)   // @allow-banned-token
+// The constructor is the third way to read the clock and cannot be replaced by assignment, so the name is shadowed
+// for every script on the page: constructing one with no argument reports and yields a fixed instant. Given a value
+// it behaves normally, because that is a constant, not a clock.
+const _RealDate = Date;
+class _SeededDate extends _RealDate { constructor(...a) { if (!a.length) { report('wall clock', new Error('the date constructor was called with no argument, which reads the wall clock. Pass a fixed value, or derive what you need from the seed.')); super(0); } else super(...a); } static now() { return _clock('Date.now')(); } }   // @allow-banned-token
+window.Date = _SeededDate;   // @allow-banned-token
+
+// ---- UTILS -----------------------------------------------------------------
+// Seeded streams: streamOf(...keys) hashes any keys (strings or integers) with the film seed into an
+// independent Mulberry32 generator. Give every feature its own keys so features never disturb each other.
+//   rd(R,a,b) float · ri(R,a,b) int · ch(R,p) chance · pk(R,arr) pick · clamp lerp sm sstep fract tri bump easeIn easeOut
+//   vn fbm (value noise) · resample chaikin curve loop bbox pip centroid rect lerpP arcPts ell circ blob rotPts tr sc ribbon
+function mul32(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function hmix(h,v){h=Math.imul(h^(v|0),0x85EBCA6B);h^=h>>>13;h=Math.imul(h,0xC2B2AE35);return(h^(h>>>16))>>>0}
+function strHash(s){let h=0x811C9DC5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function streamOf(...keys){let h=hmix(0x9E3779B9,SEED);for(const k of keys)h=hmix(h,typeof k==='string'?strHash(k):Math.round(k));const f=mul32(h);for(let i=0;i<11;i++)f();return f}
+const rd=(R,a,b)=>a+R()*(b-a);
+const ri=(R,a,b)=>Math.floor(rd(R,a,b+1));
+const ch=(R,p)=>R()<p;
+const pk=(R,arr)=>arr[(R()*arr.length)|0];
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const lerp=(a,b,t)=>a+(b-a)*t;
+const sm=t=>t*t*(3-2*t);
+const sstep=(a,b,t)=>sm(clamp((t-a)/(b-a),0,1));
+const fract=v=>v-Math.floor(v);
+const tri=t=>1-Math.abs(fract(t)*2-1);
+const bump=(a,b,u)=>u<=a||u>=b?0:Math.sin((u-a)/(b-a)*Math.PI);
+const easeOut=t=>1-Math.pow(1-clamp(t,0,1),3);
+const easeIn=t=>Math.pow(clamp(t,0,1),3);
+function h2(x,y,s){const n=Math.sin(x*127.1+y*311.7+s*74.7)*43758.5453;return n-Math.floor(n)}
+function vn(x,y,s){const xi=Math.floor(x),yi=Math.floor(y),u=sm(x-xi),v=sm(y-yi);return lerp(lerp(h2(xi,yi,s),h2(xi+1,yi,s),u),lerp(h2(xi,yi+1,s),h2(xi+1,yi+1,s),u),v)}
+function fbm(x,y,s,o=3){let a=.5,f=1,t=0,n=0;for(let i=0;i<o;i++){t+=vn(x*f,y*f,s+i*17)*a;n+=a;a*=.5;f*=2.03}return t/n}
+function resample(pts,step){if(pts.length<2)return pts.map(p=>[p[0],p[1]]);const out=[[pts[0][0],pts[0][1]]];let need=step;for(let i=1;i<pts.length;i++){let x=pts[i-1][0],y=pts[i-1][1];const x1=pts[i][0],y1=pts[i][1];let d=Math.hypot(x1-x,y1-y);while(d>=need&&d>0){const t=need/d;x+=(x1-x)*t;y+=(y1-y)*t;out.push([x,y]);d=Math.hypot(x1-x,y1-y);need=step}need-=d}const L=pts[pts.length-1],E=out[out.length-1];if(Math.hypot(L[0]-E[0],L[1]-E[1])>step*.3)out.push([L[0],L[1]]);return out}
+function chaikin(pts,closed,it=3){let p=pts.map(q=>[q[0],q[1]]);for(let k=0;k<it;k++){const n=p.length,q=[];if(n<3)return p;if(!closed)q.push(p[0]);const end=closed?n:n-1;for(let i=0;i<end;i++){const a=p[i],b=p[(i+1)%n];q.push([a[0]*.75+b[0]*.25,a[1]*.75+b[1]*.25],[a[0]*.25+b[0]*.75,a[1]*.25+b[1]*.75])}if(!closed)q.push(p[n-1]);p=q}return p}
+const curve=(pts,it=3)=>chaikin(pts,false,it);
+const loop=(pts,it=3)=>chaikin(pts,true,it);
+function bbox(P){let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const p of P){if(p[0]<x0)x0=p[0];if(p[0]>x1)x1=p[0];if(p[1]<y0)y0=p[1];if(p[1]>y1)y1=p[1]}return[x0,y0,x1,y1]}
+function pip(P,x,y){let inside=false;for(let i=0,j=P.length-1;i<P.length;j=i++){const yi=P[i][1],yj=P[j][1];if((yi>y)!==(yj>y)&&x<(P[j][0]-P[i][0])*(y-yi)/(yj-yi)+P[i][0])inside=!inside}return inside}
+function centroid(P){let x=0,y=0;for(const p of P){x+=p[0];y+=p[1]}return[x/P.length,y/P.length]}
+const rect=(x0,y0,x1,y1)=>[[x0,y0],[x1,y0],[x1,y1],[x0,y1]];
+const lerpP=(a,b,t)=>[lerp(a[0],b[0],t),lerp(a[1],b[1],t)];
+function arcPts(cx,cy,rx,ry,a0,a1,n){const p=[];for(let i=0;i<=n;i++){const t=a0+(a1-a0)*i/n;p.push([cx+Math.cos(t)*rx,cy+Math.sin(t)*ry])}return p}
+const ell=(cx,cy,rx,ry,n)=>{n=n||Math.max(14,Math.round((rx+ry)*.6));return arcPts(cx,cy,rx,ry,0,TAU,n).slice(0,n)};
+const circ=(cx,cy,r,n)=>ell(cx,cy,r,r,n);
+function blob(R,cx,cy,rx,ry,rot){const n=Math.max(12,Math.round((rx+ry)/3)),pts=[];rot=rot??rd(R,0,TAU);const a1=rd(R,.04,.1),a2=rd(R,.02,.05),p1=rd(R,0,7),p2=rd(R,0,7);for(let i=0;i<n;i++){const t=i/n*TAU,m=1+a1*Math.sin(t*2+p1)+a2*Math.sin(t*5+p2),x=Math.cos(t)*rx*m,y=Math.sin(t)*ry*m;pts.push([cx+x*Math.cos(rot)-y*Math.sin(rot),cy+x*Math.sin(rot)+y*Math.cos(rot)])}return pts}
+function rotPts(P,cx,cy,a){const c=Math.cos(a),s=Math.sin(a);return P.map(p=>{const x=p[0]-cx,y=p[1]-cy;return[cx+x*c-y*s,cy+x*s+y*c]})}
+const tr=(P,dx,dy)=>P.map(p=>[p[0]+dx,p[1]+dy]);
+const sc=(P,cx,cy,kx,ky)=>P.map(p=>[cx+(p[0]-cx)*kx,cy+(p[1]-cy)*(ky??kx)]);
+function ribbon(pts,w){const n=pts.length,L=[],Rr=[];for(let i=0;i<n;i++){const a=pts[Math.max(0,i-1)],b=pts[Math.min(n-1,i+1)];let nx=-(b[1]-a[1]),ny=b[0]-a[0];const d=Math.hypot(nx,ny)||1;nx/=d;ny/=d;const ww=(typeof w==='function'?w(n>1?i/(n-1):0):w)/2;L.push([pts[i][0]+nx*ww,pts[i][1]+ny*ww]);Rr.push([pts[i][0]-nx*ww,pts[i][1]-ny*ww])}return L.concat(Rr.reverse())}
+
+// ---- PRINT -----------------------------------------------------------------
+// Ink is never painted flat. Every tone is a halftone tile; each ink's screen sits at its own angle;
+// each plate is slightly out of register; inks multiply, so blue over yellow prints green.
+// An inkset is { paper:[r,g,b], inks:{name:[r,g,b]}, screen:{name:degrees}, plate:{name:[dx,dy]} }.
+const INKSETS = {
+  // the classic three-drum risograph: six colours from three inks
+  risoTrio: { paper: [246, 240, 226], inks: { blue: [0, 120, 191], pink: [255, 72, 176], yellow: [255, 232, 0] },
+    screen: { blue: 15, pink: 75, yellow: 0 }, plate: { blue: [1.0, -.6], pink: [-1.3, .9], yellow: [.7, 1.4] } },
+  // the four spot inks and screen angles read from Kevin Ngo's 25-rooms page source
+  pondFour: { paper: [243, 235, 221], inks: { blue: [52, 74, 128], coral: [238, 104, 82], sun: [255, 212, 40], teal: [0, 140, 138] },
+    screen: { blue: 15, coral: 75, sun: 0, teal: 45 }, plate: { blue: [.9, -.5], coral: [-1.0, .75], sun: [.6, 1.2], teal: [-.75, -.9] } },
+  // warm paper and brown line for an ink-and-hatching look (use H.hatch more than H.tint)
+  warmInk: { paper: [243, 233, 214], inks: { brown: [110, 66, 38], red: [214, 60, 48], orange: [240, 150, 50], navy: [28, 38, 78] },
+    screen: { brown: 45, red: 75, orange: 0, navy: 15 }, plate: { brown: [.5, -.3], red: [-.9, .6], orange: [.6, 1.0], navy: [-.4, -.5] } },
+};
+let PAPER = [246, 240, 226], INK = {}, INKS = [], SCREEN = {}, PLATE = {};
+// CELL is the dot pitch in logical units. 6 reads as print at 1080; below 4 the dots become square pixels.
+let CELL = 6;
+const OVER = 4, TILE = 8, LEVELS = 20;
+const rgb = (c, a = 1) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
+const tileCache = new Map();
+let patCache = new WeakMap();
+function useInks(set, o = {}) {
+  const s = typeof set === 'string' ? INKSETS[set] : set; if (!s) throw new Error('unknown inkset ' + set);
+  PAPER = s.paper.slice(); INK = { ...s.inks, paper: PAPER }; INKS = Object.keys(s.inks);
+  SCREEN = { paper: 45, ...s.screen }; PLATE = { paper: [0, 0], ...s.plate };
+  INKS.forEach((k, i) => { if (SCREEN[k] === undefined) SCREEN[k] = [15, 75, 0, 45][i % 4]; if (!PLATE[k]) PLATE[k] = [[1, -.6], [-1.3, .9], [.7, 1.4], [-.8, -.9]][i % 4]; });
+  CELL = o.cell || LOOK.cell || CELL;   // a look may set its own dot pitch: a comic's screen is much coarser than a riso's
+  applyLook();   // a look may override the paper; see the LOOKS section
+  return s;   // caches are keyed by ink colour and cell, so switching inksets per scene is cheap
+}
+// muteInks(set, ['yellow']): the same inkset with some inks printing nothing. A scene in two of its three inks is a
+// duotone beat: the audience reads it as a print run. Use it as a scene's `inkset`.
+function muteInks(set, names) { const s = typeof set === 'string' ? INKSETS[set] : set, inks = { ...s.inks }; for (const n of names) inks[n] = [255, 255, 255]; return { ...s, inks }; }
+// One tile per (ink, tone level, boil variant): dots on a grid with radius cell*sqrt(tone/pi) so coverage
+// equals tone; above 50 % the tile flips to solid ink with holes; then seeded speckle dropout. Built OVER x
+// oversize so the downscaled dots are round.
+function halftoneTile(ink, level, variant) {
+  const key = ink + '|' + INK[ink].join('.') + '|' + level + '|' + variant + '|' + CELL; let cv = tileCache.get(key); if (cv) return cv;
+  const cell = CELL * OVER, size = Math.round(cell * TILE);
+  cv = document.createElement('canvas'); cv.width = cv.height = size;
+  const c = cv.getContext('2d'), tone = level / LEVELS, R = streamOf('screen', ink, level, variant);
+  c.fillStyle = rgb(INK[ink]);
+  if (level >= LEVELS) { c.fillRect(0, 0, size, size); }
+  else if (tone <= .5) { const r0 = cell * Math.sqrt(tone / Math.PI);
+    for (let y = 0; y < TILE; y++) for (let x = 0; x < TILE; x++) { const r = r0 * rd(R, .86, 1.1); c.beginPath(); c.arc((x + .5) * cell + rd(R, -.5, .5), (y + .5) * cell + rd(R, -.5, .5), r, 0, TAU); c.fill(); } }
+  else { c.fillRect(0, 0, size, size); c.globalCompositeOperation = 'destination-out'; const r0 = cell * Math.sqrt((1 - tone) / Math.PI);
+    for (let y = 0; y <= TILE; y++) for (let x = 0; x <= TILE; x++) { const r = r0 * rd(R, .86, 1.1); c.beginPath(); c.arc(x * cell, y * cell, r, 0, TAU); c.fill(); }
+    c.globalCompositeOperation = 'source-over'; }
+  if (ink !== 'paper') { c.globalCompositeOperation = 'destination-out'; const n = Math.round(size * size / (level >= LEVELS ? 140 : 260));
+    for (let k = 0; k < n; k++) { const s = rd(R, .5, 1.4) * OVER * .5 * (R() < .05 ? 1.6 : 1); c.globalAlpha = rd(R, .25, .85); c.beginPath(); c.arc(R() * size, R() * size, s * .6, 0, TAU); c.fill(); }   // round specks: square ones rotate with the screen and read as crosses
+    c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; }
+  tileCache.set(key, cv); return cv;
+}
+// The pattern is anchored to the paper, not to the shape: translate by the plate offset, rotate by the
+// ink's screen angle, scale the oversize tile down. Shapes move over a screen that stays put, like print.
+// With a flat look there is no tile: the pattern is one solid colour and the screen angle and plate offset are unused.
+function inkPattern(ctx, ink, tone, variant, dx, dy) {
+  if (LOOK.flat) return solidOf(ink, tone);
+  let bank = patCache.get(ctx); if (!bank) { bank = new Map(); patCache.set(ctx, bank); }
+  const ang = LOOK.screens === false ? 0 : (SCREEN[ink] || 0);   // a screen print puts every colour on the same straight grid
+  const level = clamp(Math.round(tone * LEVELS), 1, LEVELS), key = ink + '|' + INK[ink].join('.') + '|' + ang + '|' + CELL + '|' + level + '|' + variant + '|' + dx.toFixed(2) + '|' + dy.toFixed(2);
+  let p = bank.get(key);
+  if (!p) { p = ctx.createPattern(halftoneTile(ink, level, variant), 'repeat'); p.setTransform(new DOMMatrix().translateSelf(dx, dy).rotateSelf(ang).scaleSelf(1 / OVER)); bank.set(key, p); }
+  return p;
+}
+
+// ---- LOOKS -----------------------------------------------------------------
+// A look is HOW a mark is made; an inkset is WHICH colours it is made in. They are independent: any look can be
+// printed in any inkset. `riso` is the default and is the print model described above (halftone plates, screen
+// angles, mis-registration, multiply). Every other look replaces the halftone with a solid colour and adds its own
+// texture, so the same film can be re-rendered in another medium without touching a single drawing.
+//   riso      halftone plates at their screen angles, out of register            the printed original
+//   screen    flat spot colours that overprint, plainly out of register           screen print, gig posters
+//   ink       flat colour with hatching along the form and a heavy line           pen and wash, storybook
+//   marker    flat colour that overprints, one dark contour, a faint grid ground  explainer and educational video
+//   cel       opaque colour in a clean dark contour, one hard-edged shadow tone    traditional 2D animation
+//   comic     a coarse dot screen in register under a heavy black key line        pop art, printed comics
+//   flat3d    opaque colour, an extruded side face and a cast shadow              isometric and app illustration
+//   cgi       shaded volumes: key light, core shadow, occlusion, rim, highlight   rendered 3D, feature animation
+//   ghibli    painted grounds of many small dabs, figures in a thin warm line     hand-painted feature animation
+//             with one soft shadow tone, true gradients in the sky
+//   stopmo    matte shaded puppets, held on twos, every piece re-placed a little    stop motion with clay, felt or wood
+//             off between exposures, and a light that flickers
+//   pixel     the whole frame resolved onto a coarse grid of square pixels        pixel art, early games
+// Built and then removed, so nobody rebuilds them without a reason. FAILED: a woodblock look (indistinguishable from
+// screen print once both are flat and posterised), a clay look built from offset bevels (mud), a low-poly look built
+// from a fan of facets (a fan only tiles a convex shape; on a landscape it made shards): cgi does what clay wanted to.
+// WORKED BUT CUT by the owner after seeing all seventeen side by side, as too close to a neighbour or not wanted:
+// pencil (pale ink), cutpaper (torn edges and fibre), silhouette, scratchboard (white hatching on black), watercolour
+// and sumi (layered washes with edge darkening). The gallery that decision was made from is looks-gallery/ in the
+// maintainer's folder; the code is in the project's notes, not here, because dead options are a cost to every reader.
+// Fields: flat (no halftone) · blend (how ink meets what is under it) · tone (every tone is scaled by this) ·
+// lineW, lineAmp (stroke weight and wobble) · grain (paper texture amount) · plates, plateScale (mis-registration and
+// how far) · screens (screen angles; false puts every ink on one straight grid) · cell (dot pitch) · posterise
+// (tones are rounded to this many steps, which is what makes a print or a cel read as flat) · outline, outlineInk
+// ('dark' = one contour colour, the darkest ink of the set), contour · round (corners are smoothed, for modelled
+// shapes) · smooth (gradients are true gradients, not bands) · shade (cel shadow), volume (rendered lighting), matte ·
+// hatch, depth, shadow, fibre, streaks, grid, dabs · hold, jitter (stop-motion cadence and re-handling) · post (a
+// whole-frame pass after everything else). Every field is optional: a look is a small patch on the riso default.
+const LOOKS = {
+  riso: { blend: 'multiply', plates: true, screens: true, tone: 1, lineW: 1, lineAmp: 1, grain: 1 },
+  screen: { flat: true, blend: 'multiply', plates: true, plateScale: 2.6, tone: .96, lineW: 1.05, lineAmp: .55, grain: .7, posterise: 3, fibre: .25 },
+  ink: { flat: true, blend: 'multiply', tone: .78, lineW: 1.45, lineAmp: 1.15, grain: .8,
+    hatch: { gap: 5, angle: 1.2, w: .9, tone: .5, skip: .25 }, outline: 1.7 },
+  marker: { flat: true, blend: 'multiply', tone: .9, lineW: 1.3, lineAmp: .5, grain: .28, paper: [252, 250, 245], outline: 2.2, outlineInk: 'dark', contour: true, streaks: 9, grid: 54 },
+  cel: { flat: true, blend: 'source-over', tone: 1, lineW: 1, lineAmp: .3, grain: .15, posterise: 4, outline: 2.8, outlineInk: 'dark', contour: true,
+    shade: { dx: .2, dy: .13, dark: .78 } },
+  comic: { plates: false, screens: false, tone: 1, lineW: 1, lineAmp: .35, grain: .3, cell: 11, posterise: 4, outline: 3, outlineInk: 'dark', contour: true },
+  flat3d: { flat: true, blend: 'source-over', tone: 1, lineW: .9, lineAmp: .25, grain: .12, paper: [238, 236, 231],
+    depth: { dx: .38, dy: .92, k: 7, shade: .72 }, shadow: { dx: 2.2, dy: 5.4, blur: 3, a: .1 } },
+  cgi: { flat: true, blend: 'source-over', tone: 1, lineW: 1, lineAmp: 0, grain: 0, paper: [226, 232, 242], round: 1, smooth: true,
+    volume: { light: [-.3, -.34], key: .5, core: .62, ao: .55, rim: .5, spec: .55, shadow: { dx: 5, dy: 16, blur: 14, a: .34 } } },
+  ghibli: { flat: true, blend: 'source-over', tone: 1, lineW: .85, lineAmp: .5, grain: .45, paper: [244, 240, 226], smooth: true, outline: 1.5, outlineInk: 'dark', contour: true,
+    shade: { dx: .3, dy: .16, dark: .8, soft: 3 }, dabs: { min: 170, per: 520, len: 15, w: 7, a: .2, angle: .5 } },
+  stopmo: { flat: true, blend: 'source-over', tone: 1, lineW: 1.1, lineAmp: .6, grain: .35, paper: [228, 222, 212], round: 1, smooth: true, matte: true, hold: 2, jitter: 1.3, fibre: .5,
+    volume: { light: [-.28, -.34], key: .34, core: .5, ao: .5, rim: 0, spec: 0, shadow: { dx: 4, dy: 11, blur: 9, a: .38 } }, post: { flicker: .035 } },
+  pixel: { flat: true, blend: 'source-over', tone: 1, lineW: 1.4, lineAmp: 0, grain: 0, posterise: 4, post: { pixel: 8 } },
+};
+let LOOK = LOOKS.riso, LOOKNAME = 'riso', SHADE = [60, 50, 44], DARKEST = null;
+function useLook(name) {
+  const L = typeof name === 'string' ? LOOKS[name] : name;
+  if (!L) { report('unknown look', new Error(`"${name}" is not a look (${Object.keys(LOOKS).join(', ')})`)); return; }
+  LOOK = L; LOOKNAME = typeof name === 'string' ? name : (name.name || 'custom');
+}
+// A look may set its own paper (a marker board is whiter than riso stock, a cut-paper ground is warmer).
+// useInks calls this, so the order of useInks and useLook never matters.
+function applyLook() {
+  if (LOOK.paper) { PAPER = LOOK.paper.slice(); INK.paper = PAPER; }
+  let best = null, darkName = INKS[0], dark = 1e9; for (const k of INKS) { const c = INK[k], v = c[0] * .3 + c[1] * .59 + c[2] * .11; if (v < dark) { dark = v; best = c; darkName = k; } }
+  DARKEST = darkName;   // the ink a look uses when it wants ONE line colour for the whole drawing, the way an explainer is contoured in a single dark pen
+  SHADE = best ? [best[0] * .45 + 20, best[1] * .45 + 16, best[2] * .45 + 14] : [60, 50, 44];   // the shadow colour: the darkest ink, darkened. Never neutral grey: a warm shadow is what makes flat colour look printed rather than rendered
+}
+// The colour of `tone` of an ink when there is no halftone to carry it.
+//   multiply looks lighten the ink toward white, so overlaps still darken like real ink on paper: tone is in the colour
+//   opaque looks keep the ink and carry tone as coverage (the caller sets the alpha), so a half tone laid over
+//   something still shows it through. Mixing tone into the colour instead would make every glow and every wash an
+//   opaque disc of pale ink, which is what a first version did.
+function solidOf(k, tone) {
+  const c = INK[k] || INK[INKS[0]], t = clamp(tone, 0, 1);
+  if (LOOK.blend === 'multiply') return rgb([255 - (255 - c[0]) * t, 255 - (255 - c[1]) * t, 255 - (255 - c[2]) * t]);
+  return rgb(c);
+}
+// Tone of an AREA mark (a fill, a wash, a glow, speckle) is scaled by the look: pencil lays down little pigment,
+// ink a little less than full. Strokes are deliberately not scaled: a pale pencil drawing still has a visible line.
+// Posterising is what makes a cel, a block print or a pixel screen read as flat: there are only so many tones a
+// medium can hold, and rounding to them is more convincing than any amount of texture.
+const areaTone = t => { t = clamp(t * LOOK.tone, 0, 1); const n = LOOK.posterise; return n ? Math.round(t * n) / n : t; };
+// Which ink a contour uses: the shape's own, or the darkest of the set, so a whole drawing is lined in one pen.
+const inkFor = (want, k) => want === 'dark' ? DARKEST : k;
+const darken = (css, f) => { const m = css.match(/[\d.]+/g); return rgb([m[0] * f, m[1] * f, m[2] * f]); };
+useInks('risoTrio');   // the default state of the page: the riso look on the three-drum inkset. Set here, not in PRINT, because a look must exist before an inkset can adopt its paper.
+
+// ---- HAND ------------------------------------------------------------------
+// Every mark goes through the hand. Shapes are point arrays [[x,y],...] in logical units.
+//   H.knock(P)            paint the paper colour (opaque): how white things exist
+//   H.tint(P, ink, tone)  multiply a halftone of `ink` at `tone` 0..1 over whatever is there
+//   H.fill(P, ink, tone)  knock + tint: an opaque printed shape
+//   H.line(pts, ink, w, {closed, amp, tone, taper:'in'|'out'|'both', dash, cap})   resampled and wobbled
+//   H.outline(P, ink, w, o)   H.dot(x, y, r, ink, tone, knock)
+//   H.hatch(P, ink, spacing, angle, w, {tone, amp, skip})   H.speckle(R, P, ink, n, r0, r1, tone)
+//   H.grad(P, ink, t0, t1, a, b, bands)   tone ramp from point a to point b, as bands of tint
+//   H.glow(x, y, rx, ry, ink, tone, rings, falloff)   H.clip(P, fn)   H.opacity(a, fn)
+//   'paper' is an ink too: H.tint(P, 'paper', .3) lays a halftone of paper colour OVER what is there, a dot-screen
+//   lightener for lit bands, beams, mist, foam. (Marks under about 6 units should use tone 1, or the hole pattern shows.)
+//   H.view({x, y, zoom, rot, to}, fn)  a camera: world point (x,y) lands at the frame centre (or at screen point `to`).
+//                                   It moves the POINTS, not the canvas, so the dot screens stay fixed to the paper.
+//   H.image(canvas, x, y, w, h)     draw a cached canvas (see stamp) under the current view
+//   H.blueprint(fn, ink, w)         run fn with every fill reduced to an outline and every line forced to one ink:
+//                                   any prop becomes a chalk diagram on a dark ground, with no `mode` parameter
+// `boil` is the boil step: it picks one of three tile/plate variants and re-seeds the line wobble.
+function mkHand(ctx, boil = 0, frame = 0) {
+  const variant = ((boil % 3) + 3) % 3, RB = streamOf('boil', boil);
+  const jit = {}; for (const k of [...INKS, 'paper']) { const J = streamOf('plate', k, variant); const ps = LOOK.plateScale || 1; jit[k] = LOOK.plates ? [(PLATE[k][0] + rd(J, -.5, .5)) * ps, (PLATE[k][1] + rd(J, -.5, .5)) * ps] : [0, 0]; }   // only riso is out of register
+  const H = { ctx, variant, boil, RB, frame };
+  let piece = 0;   // counts the shapes of this frame, so stop-motion jitter gives each piece its own small displacement
+  let V = null;   // current view
+  const tp = p => { if (!V) return p; const x = (p[0] - V.x) * V.zoom, y = (p[1] - V.y) * V.zoom; return [V.tx + x * V.c - y * V.s, V.ty + x * V.s + y * V.c]; };
+  const zw = w => V ? w * V.zoom : w;
+  const path = (P, dx = 0, dy = 0) => { ctx.beginPath(); for (let i = 0; i < P.length; i++) { const p = tp(P[i]); i ? ctx.lineTo(p[0] + dx, p[1] + dy) : ctx.moveTo(p[0] + dx, p[1] + dy); } ctx.closePath(); };
+  // Every ink mark in the film goes through here: it picks the fill style (a halftone pattern, or one solid colour
+  // under a flat look), the blending, and the plate offset. 'paper' is the exception: it must LIGHTEN what is under
+  // it, which multiply cannot do, so it is always laid over with transparency.
+  const ink = (k, tone, draw) => { if (!INK[k]) report('unknown ink', new Error(`"${k}" is not an ink of this inkset (${INKS.join(', ')}, paper)`)); const name = INK[k] ? k : INKS[0], j = jit[name] || [0, 0];
+    if (tone <= 0) return;
+    if (name === 'paper' && LOOK.flat) { ctx.save(); ctx.globalAlpha *= tone; ctx.globalCompositeOperation = 'source-over'; draw(rgb(PAPER), 0, 0); ctx.restore(); return; }
+    if (LOOK.flat && LOOK.blend === 'source-over') { ctx.save(); ctx.globalAlpha *= tone; draw(solidOf(name, 1), j[0], j[1]); ctx.restore(); return; }   // opaque look: tone is coverage
+    ctx.globalCompositeOperation = name === 'paper' ? 'source-over' : (LOOK.blend || 'multiply');
+    draw(inkPattern(ctx, name, tone, variant, j[0], j[1]), j[0], j[1]); ctx.globalCompositeOperation = 'source-over'; };
+  // a path in SCREEN space, for the decorations: shadows, extruded faces, lit volumes
+  const raws = (pts, dx = 0, dy = 0) => { ctx.beginPath(); for (let i = 0; i < pts.length; i++) i ? ctx.lineTo(pts[i][0] + dx, pts[i][1] + dy) : ctx.moveTo(pts[i][0] + dx, pts[i][1] + dy); ctx.closePath(); };
+  const soft = (pts, dx, dy, css, a, blur) => { ctx.save(); ctx.globalCompositeOperation = 'multiply'; for (let i = 0; i < blur; i++) { ctx.globalAlpha = a; raws(pts, dx + i * .9, dy + i * 1.1); ctx.fillStyle = css; ctx.fill(); } ctx.restore(); };
+  const fillScreen = (pts, css, op = 'source-over', alpha = 1) => { ctx.save(); ctx.globalCompositeOperation = op; ctx.globalAlpha *= alpha; raws(pts); ctx.fillStyle = css; ctx.fill(); ctx.restore(); };
+  // Cel shading: ONE darker tone with a HARD edge, which is the whole grammar of drawn animation. The shadow is the
+  // shape itself, slid toward the light and cut out of the silhouette, so what remains is a crescent on the far side.
+  const celShade = (pts, k, tone, o) => { const [x0, y0, x1, y1] = bbox(pts), dx = (x1 - x0) * o.dx, dy = (y1 - y0) * o.dy; ctx.save(); raws(pts); ctx.clip();
+    ctx.beginPath(); ctx.rect(x0 - 9, y0 - 9, x1 - x0 + 18, y1 - y0 + 18); for (let i = pts.length - 1; i >= 0; i--) i === pts.length - 1 ? ctx.moveTo(pts[i][0] - dx, pts[i][1] - dy) : ctx.lineTo(pts[i][0] - dx, pts[i][1] - dy); ctx.closePath();
+    ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = o.soft ? rgb(SHADE, .0) : '#000'; ctx.globalAlpha = 1 - o.dark; if (o.soft) { ctx.filter = `blur(${zw(o.soft)}px)`; ctx.fillStyle = rgb(SHADE); ctx.globalAlpha = (1 - o.dark) * 1.5; } ctx.fill('evenodd'); ctx.restore(); };
+  // Volume shading, the rendered-3D look. Nothing here is three-dimensional: it is the five things a lit solid shows,
+  // each painted inside the silhouette. A key light (a soft bright pool toward the light), a core shadow (the far side
+  // falls off into a COLOURED dark, never grey), ambient occlusion (the form darkens where it turns away at its edge),
+  // a rim light (a cool sliver just inside the far edge), a highlight, and outside it a blurred contact shadow.
+  const volume = (pts, k, tone, o, matte, decal) => { const [x0, y0, x1, y1] = bbox(pts), w = x1 - x0, h = y1 - y0, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, r = Math.max(w, h), base = solidOf(k, areaTone(tone)), m = base.match(/[\d.]+/g).map(Number);
+    const dark = rgb([m[0] * .34 + 26, m[1] * .24 + 10, m[2] * .38 + 38]), lx = cx + w * o.light[0], ly = cy + h * o.light[1], big = Math.min(w, h) > zw(26);
+    if (decal) { ctx.save(); raws(pts); ctx.clip(); ctx.filter = `blur(${zw(5)}px)`; ctx.globalAlpha = areaTone(tone); raws(pts); ctx.fillStyle = base; ctx.fill(); ctx.restore(); return; }   // a marking ON a surface (a belly, a cheek): soft-edged colour, no lighting of its own
+    if (o.shadow && big) { ctx.save(); ctx.filter = `blur(${zw(o.shadow.blur)}px)`; ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = o.shadow.a; raws(pts, zw(o.shadow.dx), zw(o.shadow.dy)); ctx.fillStyle = rgb(SHADE); ctx.fill(); ctx.restore(); }
+    ctx.save(); raws(pts); ctx.clip(); ctx.fillStyle = base; ctx.fillRect(x0 - 4, y0 - 4, w + 8, h + 8);
+    let g = ctx.createRadialGradient(lx, ly, r * .08, cx + w * .06, cy + h * .08, r * .82); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(.5, 'rgba(255,255,255,0)'); g.addColorStop(1, dark);
+    ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = o.core; ctx.fillStyle = g; ctx.fillRect(x0 - 4, y0 - 4, w + 8, h + 8);
+    g = ctx.createRadialGradient(lx, ly, 0, lx, ly, r * .6); g.addColorStop(0, 'rgba(255,250,240,1)'); g.addColorStop(1, 'rgba(255,250,240,0)');
+    ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = o.key; ctx.fillStyle = g; ctx.fillRect(x0 - 4, y0 - 4, w + 8, h + 8); ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = o.key * .35; ctx.fillRect(x0 - 4, y0 - 4, w + 8, h + 8);
+    if (big) { ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = o.ao; ctx.filter = `blur(${zw(Math.min(9, r * .05))}px)`; ctx.strokeStyle = dark; ctx.lineWidth = zw(Math.min(16, r * .09)); raws(pts); ctx.stroke();
+      if (o.rim) { ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = o.rim; ctx.filter = `blur(${zw(2.2)}px)`; ctx.strokeStyle = 'rgb(170,205,255)'; ctx.lineWidth = zw(Math.min(7, r * .035)); raws(pts, -w * .035, -h * .035); ctx.stroke(); }
+      if (o.spec && !matte) { ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = o.spec; ctx.filter = `blur(${zw(Math.max(1.5, r * .02))}px)`; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(lx - w * .02, ly - h * .02, w * .1, h * .065, -.5, 0, TAU); ctx.fill(); } }
+    ctx.restore(); };
+  // Painted ground: what makes a background read as gouache is that a big area of "one colour" is really hundreds of
+  // dabs a little lighter and darker than each other. Dabs are placed in the SHAPE'S OWN box and seeded by the shape,
+  // so they belong to it and move with it; they do not crawl from frame to frame.
+  const dabs = (P, pts, k, tone, o) => { const [wx0, wy0, wx1, wy1] = bbox(P), area = (wx1 - wx0) * (wy1 - wy0), n = Math.min(900, Math.round(area / o.per)), R = streamOf('dab', P.length, Math.round(tone * 20), k), base = solidOf(k, areaTone(tone));
+    ctx.save(); raws(pts); ctx.clip(); ctx.lineCap = 'round';
+    for (let i = 0; i < n; i++) { const q = tp([rd(R, wx0, wx1), rd(R, wy0, wy1)]), a = rd(R, -.5, .5) + o.angle, L = zw(rd(R, o.len * .5, o.len)), lighter = R() < .5;
+      ctx.globalCompositeOperation = lighter ? 'screen' : 'multiply'; ctx.globalAlpha = rd(R, .05, o.a); ctx.strokeStyle = lighter ? 'rgb(255,248,225)' : base; ctx.lineWidth = zw(rd(R, o.w * .5, o.w));
+      ctx.beginPath(); ctx.moveTo(q[0] - Math.cos(a) * L, q[1] - Math.sin(a) * L); ctx.lineTo(q[0] + Math.cos(a) * L, q[1] + Math.sin(a) * L); ctx.stroke(); }
+    ctx.restore(); };
+  H.view = (v, fn) => { const prev = V, rot = v.rot || 0; V = { x: v.x ?? CX, y: v.y ?? CY, zoom: v.zoom ?? 1, c: Math.cos(rot), s: Math.sin(rot), tx: v.to ? v.to[0] : CX, ty: v.to ? v.to[1] : CY }; try { return fn(); } finally { V = prev; } };
+  H.toScreen = p => tp(p);
+  H.knock = (P, a = 1) => { if (P.length < 3) return; path(P); ctx.fillStyle = a >= 1 ? rgb(PAPER) : rgb(PAPER, a); ctx.fill(); };
+  H.tint = (P, k, tone = 1) => { tone = areaTone(tone); if (tone <= 0 || P.length < 3) return; ink(k, tone, (st, dx, dy) => { path(P, dx, dy); ctx.fillStyle = st; ctx.fill(); }); };
+  // fill = knock + tint, plus whatever the look adds. A drawing never asks for hatching, a cast shadow or a lit
+  // volume: it asks for a filled shape, and the look decides what that means. This is what lets one film render in
+  // many media. Decorations are skipped for very small shapes, where they would only be noise.
+  H.fill = (P, k, tone = 1) => {
+    if (!P || P.length < 3) return; k = INK[k] ? k : INKS[0];
+    const L = LOOK;
+    // scenery is judged on the shape AS DRAWN: a floor or a sky is never rounded, lit or shadowed like an object
+    const [bx0, by0, bx1, by1] = bbox(P), scenery = (bx1 - bx0) > FW * .58 || (by1 - by0) > FH * .58;
+    const Q = L.round && !scenery ? chaikin(P, true, L.round) : P; let sp = Q.map(tp); piece++;
+    // stop motion: every piece is picked up and put back between exposures, never quite where it was
+    if (L.jitter) { const J = streamOf('handled', Math.floor(frame / (L.hold || 1)), piece), jx = rd(J, -1, 1) * zw(L.jitter), jy = rd(J, -1, 1) * zw(L.jitter); sp = sp.map(q => [q[0] + jx, q[1] + jy]); }
+    const [x0, y0, x1, y1] = bbox(sp), big = Math.min(x1 - x0, y1 - y0) > zw(9), shape = sp;
+    if (L.shadow && big && !scenery) soft(shape, zw(L.shadow.dx), zw(L.shadow.dy), rgb(SHADE), L.shadow.a, L.shadow.blur);
+    if (L.depth && big) { const d = zw(L.depth.k); fillScreen(sp.map(q => [q[0] + L.depth.dx * d, q[1] + L.depth.dy * d]), darken(solidOf(k, areaTone(tone)), L.depth.shade)); }
+    if (L.volume) { if (tone > 0) { const gr = scenery; gr ? fillScreen(shape, solidOf(k, areaTone(tone)), 'source-over', areaTone(tone)) : volume(shape, k, tone, L.volume, L.matte, tone < .7);
+      if (gr) { const g = ctx.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, 'rgba(255,255,255,.16)'); g.addColorStop(1, 'rgba(20,10,40,.2)'); ctx.save(); raws(shape); ctx.clip(); ctx.globalCompositeOperation = 'soft-light'; ctx.fillStyle = g; ctx.fillRect(x0, y0, x1 - x0, y1 - y0); ctx.restore(); } } }   // scenery gets one quiet gradient, not the full lighting of an object
+    else if (L.jitter) { fillScreen(shape, rgb(PAPER)); if (tone > 0) fillScreen(shape, solidOf(k, areaTone(tone)), 'source-over', areaTone(tone)); }
+    else { H.knock(Q); if (tone > 0) H.tint(Q, k, tone); }
+    if (tone <= 0 || !big) return;
+    if (L.dabs && (x1 - x0) * (y1 - y0) > zw(L.dabs.min) * zw(L.dabs.min)) dabs(Q, shape, k, tone, L.dabs);
+    if (L.shade && !scenery) celShade(shape, k, tone, L.shade);
+    if (L.hatch) H.hatch(Q, k, L.hatch.gap, L.hatch.angle + (vn(P.length * .7, (x0 + y1) * .01, 3) - .5) * 1.5, L.hatch.w, { tone: L.hatch.tone * tone, skip: L.hatch.skip, amp: L.lineAmp * .5 });   // each shape hatches in its own direction, so a drawing does not look combed
+    if (L.fibre) H.speckle(streamOf('fibre', P.length, Math.round(tone * 20)), Q, k, Math.round((x1 - x0) * (y1 - y0) / 900), .4, 1.1, .5 * tone);
+    if (L.outline) H.line(Q, inkFor(L.outlineInk, k), L.outline, { closed: true, tone: L.contour ? 1 : clamp(tone + .35, 0, 1) });
+    if (L.streaks && x1 - x0 < FW * .62) for (let i = 0; i < 3; i++) { const y = lerp(y0, y1, (i + .7) / 3.4); ctx.save(); ctx.globalAlpha *= .5; ctx.globalCompositeOperation = 'multiply'; ctx.strokeStyle = solidOf(k, .18); ctx.lineWidth = zw(L.streaks); ctx.lineCap = 'round'; raws(sp); ctx.clip(); ctx.beginPath(); ctx.moveTo(x0 - 4, y); ctx.lineTo(x1 + 4, y + zw(1.5)); ctx.stroke(); ctx.restore(); }   // the streak a felt tip leaves inside a filled area
+  };
+  // the wobble: displace each point along its normal by two sines with seeded phase, plus a little jitter
+  H.wob = (rs, amp) => { const n = rs.length, q = new Array(n), P1 = rd(RB, 0, 7), P2 = rd(RB, 0, 7), F1 = rd(RB, 1.4, 3), F2 = rd(RB, 5, 9);
+    for (let i = 0; i < n; i++) { const t = n > 1 ? i / (n - 1) : 0, A = rs[Math.max(0, i - 1)], B = rs[Math.min(n - 1, i + 1)]; let nx = -(B[1] - A[1]), ny = B[0] - A[0]; const d = Math.hypot(nx, ny) || 1; nx /= d; ny /= d;
+      const off = amp * (.65 * Math.sin(t * F1 * 2 + P1) + .35 * Math.sin(t * F2 + P2)); q[i] = [rs[i][0] + nx * off + rd(RB, -.15, .15), rs[i][1] + ny * off + rd(RB, -.15, .15)]; } return q; };
+  H.line = (pts, k, w = 1.6, o = {}) => {
+    if (!pts || pts.length < 2) return; k = k || INKS[0];
+    const src = (o.closed ? pts.concat([pts[0]]) : pts).map(tp); w = zw(w * LOOK.lineW);
+    const rs = resample(src, Math.max(2.5, w * 1.4)); if (rs.length < 2) return;
+    const amp = (o.amp ?? Math.min(.9, w * .18 + .25)) * LOOK.lineAmp, q = amp > 0 ? H.wob(rs, amp) : rs, tone = o.tone ?? 1;
+    const raw = (P, dx, dy) => { ctx.beginPath(); for (let i = 0; i < P.length; i++) i ? ctx.lineTo(P[i][0] + dx, P[i][1] + dy) : ctx.moveTo(P[i][0] + dx, P[i][1] + dy); };
+    if (o.taper) { const P = ribbon(q, t => { let e = 1; if (o.taper === 'out') e = .2 + .8 * (1 - t); else if (o.taper === 'in') e = .2 + .8 * t; else e = .25 + .75 * Math.min(1, Math.min(t, 1 - t) / .25); return Math.max(.4, w * e); });
+      ink(k, tone, (st, dx, dy) => { raw(P, dx, dy); ctx.closePath(); ctx.fillStyle = st; ctx.fill(); }); return; }
+    ink(k, tone, (st, dx, dy) => { ctx.strokeStyle = st; ctx.lineWidth = w; ctx.lineCap = o.cap || 'round'; ctx.lineJoin = 'round'; if (o.dash) ctx.setLineDash(o.dash); raw(q, dx, dy); ctx.stroke(); if (o.dash) ctx.setLineDash([]); });
+  };
+  H.outline = (P, k, w = 1.4, o = {}) => H.line(P, k, w, { ...o, closed: true });
+  H.dot = (x, y, r, k, tone = 1, knock = false) => { const P = circ(x, y, r, Math.max(8, Math.round(r * 2))); knock ? H.fill(P, k || INKS[0], tone) : H.tint(P, k || INKS[0], tone); };
+  H.clip = (P, fn) => { ctx.save(); path(P); ctx.clip(); try { return fn(); } finally { ctx.restore(); } };
+  H.opacity = (a, fn) => { ctx.save(); ctx.globalAlpha *= clamp(a, 0, 1); try { return fn(); } finally { ctx.restore(); } };
+  H.hatch = (P, k, sp, ang, w = 1, o = {}) => { const [x0, y0, x1, y1] = bbox(P), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, D = Math.hypot(x1 - x0, y1 - y0) / 2 + 4, dx = Math.cos(ang), dy = Math.sin(ang), nx = -dy, ny = dx;
+    H.clip(P, () => { for (let s = -D; s <= D; s += sp) { if (o.skip && RB() < o.skip) continue; const px = cx + nx * s, py = cy + ny * s; H.line([[px - dx * D, py - dy * D], [px + dx * D, py + dy * D]], k, w, { amp: o.amp ?? .4, tone: o.tone }); } }); };
+  H.speckle = (R, P, k, n, r0 = .8, r1 = 1.8, tone = 1) => { tone = areaTone(tone); const [x0, y0, x1, y1] = bbox(P), d = []; for (let i = 0; i < n; i++) { const x = rd(R, x0, x1), y = rd(R, y0, y1); if (pip(P, x, y)) { const q = tp([x, y]); d.push([q[0], q[1], zw(rd(R, r0, r1))]); } }
+    ink(k, tone, (st, dx, dy) => { ctx.fillStyle = st; ctx.beginPath(); for (const s of d) { ctx.moveTo(s[0] + s[2] + dx, s[1] + dy); ctx.arc(s[0] + dx, s[1] + dy, s[2], 0, TAU); } ctx.fill(); }); };
+  H.grad = (P, k, t0, t1, a, b, n = 10) => {
+    if (LOOK.smooth) { const A = tp(a), B = tp(b), g = ctx.createLinearGradient(A[0], A[1], B[0], B[1]), c = INK[k] || INK[INKS[0]]; g.addColorStop(0, rgb(c, areaTone(t0))); g.addColorStop(1, rgb(c, areaTone(t1))); ctx.save(); path(P); ctx.fillStyle = g; ctx.fill(); ctx.restore(); return; }   // a rendered look has no bands: one real gradient
+    const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L, nx = -uy, ny = ux, Wd = 4000;
+    H.clip(P, () => { for (let i = 0; i < n; i++) { const s0 = i / n * L - (i ? 0 : Wd), s1 = (i + 1) / n * L + (i === n - 1 ? Wd : 0), t = lerp(t0, t1, (i + .5) / n); if (t <= .02) continue;
+      H.tint([[a[0] + ux * s0 + nx * Wd, a[1] + uy * s0 + ny * Wd], [a[0] + ux * s1 + nx * Wd, a[1] + uy * s1 + ny * Wd], [a[0] + ux * s1 - nx * Wd, a[1] + uy * s1 - ny * Wd], [a[0] + ux * s0 - nx * Wd, a[1] + uy * s0 - ny * Wd]], k, t); } }); };
+  // the light fades to nothing AT the radius, and with the default falloff most of what you see sits inside the inner half.
+  // For a broad wash pass falloff .5 to .7, or stack a wide faint glow under a tight bright one.
+  H.glow = (x, y, rx, ry, k, tone = .6, n = 7, falloff = 1.3) => { tone = areaTone(tone); const q = tp([x, y]); rx = zw(rx); ry = zw(ry);
+    if (LOOK.smooth) { const c = INK[k] || INK[INKS[0]], g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1); g.addColorStop(0, rgb(c, tone)); g.addColorStop(1, rgb(c, 0)); ctx.save(); ctx.translate(q[0], q[1]); ctx.scale(rx, ry); ctx.globalCompositeOperation = 'screen'; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 1, 0, TAU); ctx.fill(); ctx.restore(); return; } for (let i = 0; i < n; i++) { const f0 = i / n, f1 = (i + 1) / n, t = tone * Math.pow(1 - (f0 + f1) / 2, falloff); if (t <= .03) continue;
+    ink(k || INKS[0], t, (st, dx, dy) => { ctx.beginPath(); ctx.ellipse(q[0] + dx, q[1] + dy, rx * f1, ry * f1, 0, 0, TAU); if (i) { ctx.moveTo(q[0] + dx + rx * f0, q[1] + dy); ctx.ellipse(q[0] + dx, q[1] + dy, rx * f0, ry * f0, 0, 0, TAU, true); } ctx.fillStyle = st; ctx.fill('evenodd'); }); } };
+  H.image = (im, x, y, w, h) => { const a = tp([x, y]), b = tp([x + w, y + h]); ctx.drawImage(im, a[0], a[1], b[0] - a[0], b[1] - a[1]); };
+  H.blueprint = (fn, k = 'paper', w = 1.6) => { const keep = { fill: H.fill, tint: H.tint, knock: H.knock, line: H.line, grad: H.grad, glow: H.glow, speckle: H.speckle, image: H.image }, seen = new Set();
+    const edge = P => { if (!P || P.length < 3) return; const id = P.length + '|' + Math.round(P[0][0]) + '|' + Math.round(P[0][1]) + '|' + Math.round(P[1][0]) + '|' + Math.round(P[1][1]); if (seen.has(id)) return; seen.add(id); keep.line(P, k, w, { closed: true, tone: .95 }); };
+    H.fill = P => edge(P); H.tint = P => edge(P); H.knock = () => {}; H.grad = () => {}; H.glow = () => {}; H.speckle = () => {}; H.image = (im, x, y, ww, hh) => edge(rect(x, y, x + ww, y + hh)); H.line = (pts, _k, ww, o) => keep.line(pts, k, ww, o);
+    try { return fn(); } finally { Object.assign(H, keep); } };
+  return H;
+}
+
+// ---- PAPER -----------------------------------------------------------------
+// The stock: short fibres and a fine speckle laid over every finished frame. Seeded per boil variant,
+// so the paper breathes at the boil rate and never flickers per frame.
+// A look may print its ground first: the faint grid of a notebook or a whiteboard, which is what makes a diagram
+// read as a diagram. Drawn UNDER everything, so call it before the scene, unlike grain which goes over the top.
+function ground(c) { if (!LOOK.grid) return; const g = LOOK.grid; c.save(); c.globalCompositeOperation = 'multiply'; c.fillStyle = rgb(SHADE, .07);
+  for (let y = g; y < FH; y += g) for (let x = g; x < FW; x += g) { c.beginPath(); c.arc(x, y, 1.5, 0, TAU); c.fill(); } c.restore(); }
+// The whole-frame pass some looks end with. Pixel art is the clear case: a picture is not pixel art because its
+// shapes are blocky, it is pixel art because the FRAME is resolved onto a coarse grid, so the pass belongs here and
+// not in any one mark. It runs on the finished frame, in device pixels, after the grain.
+function post(c, frame = 0) { const P = LOOK.post; if (!P) return; const cv = c.canvas;
+  // a lamp on a stop-motion set is never quite steady from one exposure to the next
+  if (P.flicker) { const F = streamOf('flicker', Math.floor(frame / (LOOK.hold || 1))), v = rd(F, -1, 1) * P.flicker; c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = v > 0 ? 'screen' : 'multiply'; c.fillStyle = v > 0 ? `rgba(255,244,225,${v})` : `rgba(40,30,20,${-v})`; c.fillRect(0, 0, cv.width, cv.height); c.restore(); }
+  if (P.pixel) { const k = Math.max(2, Math.round(P.pixel * cv.width / FW)), w = Math.max(1, Math.round(cv.width / k)), h = Math.max(1, Math.round(cv.height / k));
+    const sm = document.createElement('canvas'); sm.width = w; sm.height = h; const g = sm.getContext('2d'); g.imageSmoothingEnabled = true; g.drawImage(cv, 0, 0, w, h);
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.imageSmoothingEnabled = false; c.clearRect(0, 0, cv.width, cv.height); c.drawImage(sm, 0, 0, w, h, 0, 0, cv.width, cv.height); c.restore(); } }
+function grain(c, variant) { const G = LOOK.grain; if (G <= 0) return; const R = streamOf('grain', variant); c.save(); c.globalAlpha = G; c.globalCompositeOperation = 'multiply'; c.lineCap = 'round';
+  const nf = Math.round(FW * FH / 900); for (let i = 0; i < nf; i++) { const x = R() * FW, y = R() * FH, a = R() * TAU, L = 3 + R() * R() * 16, k = (R() - .5) * .8; c.strokeStyle = 'rgba(120,96,70,' + (.04 + R() * .06).toFixed(3) + ')'; c.lineWidth = .6 + R() * .6; c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + Math.cos(a + k) * L * .5, y + Math.sin(a + k) * L * .5, x + Math.cos(a) * L, y + Math.sin(a) * L); c.stroke(); }
+  // fine dropout over the whole sheet: unlike the tile speckle it never repeats, which is what makes solid ink look printed
+  c.globalCompositeOperation = 'screen'; const ns = Math.round(FW * FH / 420); for (let i = 0; i < ns; i++) { const s = .45 + R() * R() * 1.3; c.fillStyle = 'rgba(255,255,255,' + (.08 + R() * .22).toFixed(3) + ')'; c.beginPath(); c.arc(R() * FW, R() * FH, s, 0, TAU); c.fill(); }
+  // stray ink: a few tiny dots of every ink where they do not belong
+  c.globalCompositeOperation = 'multiply'; for (const k of INKS) { c.fillStyle = rgb(INK[k], .55); const n = Math.round(FW * FH / 9000); for (let i = 0; i < n; i++) { c.beginPath(); c.arc(R() * FW, R() * FH, .5 + R() * R() * 1.2, 0, TAU); c.fill(); } }
+  c.restore(); }
+// Registration marks in every ink (their offsets show the mis-registration) and a row of swatches.
+// Put it on the end card: it is what makes a frame read as a proof sheet.
+function proofMarks(H, o = {}) { const inset = o.inset ?? 60, len = 30;
+  for (const [x, y] of [[inset, inset], [FW - inset, inset], [FW - inset, FH - inset], [inset, FH - inset]]) for (const k of INKS) { H.line([[x - len, y], [x + len, y]], k, 1.8, { amp: 0 }); H.line([[x, y - len], [x, y + len]], k, 1.8, { amp: 0 }); H.line(circ(x, y, 13, 32), k, 1.5, { closed: true, amp: 0 }); }
+  if (o.swatches === false) return; let n = 0; const s = 30, bx = FW - inset - 6, by = FH - inset - 70; const sw = fn => { const P = rect(bx - (n + 1) * (s + 5), by, bx - n * (s + 5) - 5, by + s); fn(P); H.outline(P, INKS[0], .7, { tone: .5, amp: 0 }); n++; };
+  for (const k of INKS) for (const t of [1, .5, .2]) sw(P => H.fill(P, k, t));
+  for (let i = 0; i < INKS.length; i++) for (let j = i + 1; j < INKS.length; j++) sw(P => { H.fill(P, INKS[i], 1); H.tint(P, INKS[j], 1); }); }
+
+// ---- MOTIFS AND REVEALS ----------------------------------------------------
+// The recurring devices of the reference films, drawn through the hand so they print like everything else.
+// The list of devices follows alesha-pro's frame-by-frame study of the four films (hand-drawn-canvas-animation, MIT,
+// (c) 2026 Alexey Fateev). They are re-implemented here on the print hand; hexCells and a few constants (the seed dot's
+// second-ink offset, the dot burst's ray lengths) follow that implementation closely and are used under its licence.
+function polyPts(cx, cy, r, n, rot = 0) { const p = []; for (let i = 0; i < n; i++) { const a = rot + i / n * TAU; p.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); } return p; }
+function starPts(cx, cy, r1, r2, n, rot = 0) { const p = []; for (let i = 0; i < n * 2; i++) { const a = rot + i / (n * 2) * TAU, r = i % 2 ? r2 : r1; p.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); } return p; }
+// partial(pts, u): the first fraction u of a path by length. H.line(partial(P, u), ...) is a line drawing itself.
+function partial(pts, u, closed = false) { u = clamp(u, 0, 1); const rs = resample(closed ? pts.concat([pts[0]]) : pts, 3); return rs.slice(0, Math.max(2, Math.round(rs.length * u))); }
+// rings: concentric wobbly rings; animate the radii outward and drop the ones past the frame. The flipbook's pulse.
+function rings(H, x, y, radii, ink, w = 3, o = {}) { for (const r of radii) if (r > 1) H.line(ell(x, y, r, r * (o.squash ?? 1), Math.max(24, Math.round(r / 5))), ink, w, { closed: true, amp: o.amp ?? 1.2, tone: o.tone ?? 1, dash: o.dash }); }
+// seedDot: the anchor dot, in two inks a little apart
+function seedDot(H, x, y, r = 9, a, b) { H.dot(x + r * .3, y + r * .2, r, b || INKS[1 % INKS.length], .9); H.dot(x, y, r, a || INKS[0], 1); }
+// guides: construction lines with ticks, a circle and a few crosses. They say "this is a drawing being made".
+function guides(H, R, x, y, rad, ink, tone = .5) { ink = ink || INKS[0];
+  for (let i = 0; i < 3; i++) { const a = rd(R, 0, Math.PI), L = rad * rd(R, 1.3, 2.5), dx = Math.cos(a), dy = Math.sin(a); H.line([[x - dx * L, y - dy * L], [x + dx * L, y + dy * L]], ink, .9, { tone, amp: .3 });
+    for (let k = -3; k <= 3; k++) { const u = k * L / 4, px = x + dx * u, py = y + dy * u; H.line([[px - dy * 5, py + dx * 5], [px + dy * 5, py - dx * 5]], ink, .9, { tone, amp: 0 }); } }
+  H.line(circ(x, y, rad * 1.12, 48), ink, .9, { closed: true, tone, amp: .4 });
+  for (let i = 0; i < 5; i++) { const px = x + rd(R, -1.5, 1.5) * rad, py = y + rd(R, -1.5, 1.5) * rad; H.line([[px - 6, py], [px + 6, py]], ink, .9, { tone, amp: 0 }); H.line([[px, py - 6], [px, py + 6]], ink, .9, { tone, amp: 0 }); } }
+// hex lattices: eyes, cells, tiles, LEDs, "many of the same"
+function hexCells(box, s, fn) { const w = Math.sqrt(3) * s, h = 1.5 * s, [bx, by, bw, bh] = box; let row = 0; for (let y = by - s; y < by + bh + s; y += h, row++) { const o = row % 2 ? w / 2 : 0; for (let x = bx - w + o; x < bx + bw + w; x += w) fn(x, y, row); } }
+const hexPts = (x, y, s) => polyPts(x, y, s, 6, Math.PI / 6);
+function hexLattice(H, P, s, ink, tone = .6, w = .8) { const [x0, y0, x1, y1] = bbox(P); H.clip(P, () => hexCells([x0, y0, x1 - x0, y1 - y0], s, (x, y) => H.line(hexPts(x, y, s), ink, w, { closed: true, tone, amp: 0 }))); }
+// spark: a nucleus with rays; g 0..1 ignites it
+function spark(H, R, x, y, r, n, ink, g = 1) { for (let i = 0; i < n; i++) { const a = i / n * TAU + rd(R, -.15, .15), r0 = r * 1.6, r1 = r * rd(R, 2.6, 4.2) * g; if (r1 > r0) H.line([[x + Math.cos(a) * r0, y + Math.sin(a) * r0], [x + Math.cos(a) * r1, y + Math.sin(a) * r1]], ink, 1.4, { amp: .2, taper: 'out' }); } H.dot(x, y, r, ink, 1, true); H.dot(x + r * .2, y - r * .2, r * .35, 'paper', 1); }
+// dotBurst: fireworks made of dots on rays
+function dotBurst(H, R, x, y, rad, rays, ink, g = 1) { for (let k = 0; k < rays; k++) { const a = k / rays * TAU + rd(R, -.1, .1), n = ri(R, 6, 11); for (let j = 1; j <= n; j++) { const d = rad * g * j / n * rd(R, .9, 1.1); H.dot(x + Math.cos(a) * d, y + Math.sin(a) * d, rd(R, 1.2, 2.4), ink, .95 - j / n * .6); } } }
+// speedLines: strokes trailing behind something moving in direction `dir` (radians)
+function speedLines(H, R, x, y, dir, ink, n = 7, tone = .7) { const px = -Math.sin(dir), py = Math.cos(dir); for (let i = 0; i < n; i++) { const side = rd(R, -35, 35), back = rd(R, 30, 70), L = rd(R, 60, 180), x0 = x - Math.cos(dir) * back + px * side, y0 = y - Math.sin(dir) * back + py * side; H.line([[x0, y0], [x0 - Math.cos(dir) * L, y0 - Math.sin(dir) * L]], ink, rd(R, .8, 2.6), { tone, taper: 'out', amp: .4 }); } }
+// scrawl: rows of illegible handwriting: letters, notes, walls of text
+function scrawl(H, R, x, y, w, rows, o = {}) { const lineH = o.lineH ?? 18, amp = o.amp ?? 4, ink = o.ink || INKS[0];
+  for (let l = 0; l < rows; l++) { let px = x; const py = y + l * lineH, end = x + w * (l === rows - 1 ? rd(R, .35, .85) : rd(R, .9, 1));
+    while (px < end) { const wl = rd(R, 14, 54), f = rd(R, .6, 1.2), pts = []; for (let u = 0; u <= wl; u += 3) pts.push([px + u, py - Math.abs(Math.sin(u * f)) * amp * rd(R, .5, 1.3)]); H.line(pts, ink, o.w ?? 1.2, { tone: o.tone ?? .8, amp: .2 }); px += wl + rd(R, 6, 14); } } }
+// steam: vapour rising from (x, y). Tapered lines read as grass and hard-edged ribbons as flames; what reads as steam is a
+// soft S-curved ribbon of PAPER, faintly outlined, fading as it climbs. f animates it; n wisps; h is the height.
+function steam(H, R, x, y, h, f, o = {}) { const n = o.n ?? 3, ink = o.ink || INKS[0], spread = o.spread ?? h * .18;
+  for (let k = 0; k < n; k++) { const ph = rd(R, 0, TAU), sp = rd(R, .02, .035), x0 = x + (k - (n - 1) / 2) * spread * .7, life = fract(f * sp * .5 + k / n), top = h * (.45 + .55 * life), pts = [];
+    for (let i = 0; i <= 8; i++) { const t = i / 8; pts.push([x0 + Math.sin(t * 3.2 + ph + f * sp * 2) * spread * (.25 + t), y - t * top]); }
+    const P = ribbon(curve(pts, 2), t => (o.w ?? h * .09) * Math.sin(Math.min(1, t * 1.15) * Math.PI) + 1);
+    H.opacity((o.alpha ?? .8) * (1 - life * .7), () => { H.knock(P); H.outline(P, ink, .9, { tone: .35, amp: .4 }); }); } }
+// tornEdge: a polygon covering the frame below a torn line at height y. H.fill it for a new paper section rising.
+function tornEdge(R, y, amp = 9, step = 14) { const P = [[-20, FH + 20], [-20, y]]; for (let x = -20; x <= FW + 20; x += step) P.push([x, y + rd(R, -amp, amp) + Math.sin(x / 60) * amp * .6]); P.push([FW + 20, FH + 20]); return P; }
+// bands: faint diagonal light bands across the ground, as on the fruit-fly film's paper
+function bands(H, ink, tone = .12, angle = -Math.PI / 4, pitch = 160, width = 80) { const c = Math.cos(angle), s = Math.sin(angle), L = FW + FH; for (let i = -9; i <= 9; i++) { const ox = CX - s * i * pitch, oy = CY + c * i * pitch, hx = -s * width / 2, hy = c * width / 2; H.tint([[ox - c * L + hx, oy - s * L + hy], [ox + c * L + hx, oy + s * L + hy], [ox + c * L - hx, oy + s * L - hy], [ox - c * L - hx, oy - s * L - hy]], ink, tone); } }
+// REVEALS: drawn transitions. One device between two shots, never two in a row.
+// iris: draw fn() inside a circle; grow r to open onto another render
+function iris(H, x, y, r, fn, o = {}) { if (r <= 0) return; const P = circ(x, y, r, Math.max(32, Math.round(r / 4))); H.clip(P, () => { H.knock(P); fn(); }); if (o.ring !== false) H.line(P, o.ink || INKS[0], o.w ?? 3, { closed: true, amp: 1.4 }); }
+// blot: fn() revealed inside a growing ink blot with a bristly fringe
+function blot(H, R, x, y, r, fn, o = {}) { if (r <= 0) return; const P = []; for (let i = 0; i < 72; i++) { const a = i / 72 * TAU, rr = r * rd(R, .92, 1.08); P.push([x + Math.cos(a) * rr, y + Math.sin(a) * rr]); }
+  H.clip(P, () => { H.knock(P); fn(); }); const ink = o.ink || INKS[0], n = Math.min(360, 60 + Math.round(r));
+  for (let i = 0; i < n; i++) { const a = rd(R, 0, TAU), rad = r * rd(R, .93, 1.07), L = rd(R, 10, 48); H.line([[x + Math.cos(a) * rad, y + Math.sin(a) * rad], [x + Math.cos(a) * (rad + L), y + Math.sin(a) * (rad + L)]], ink, 1.6, { amp: 0, taper: 'out' }); } }
+// flash: one frame of bare paper (an impact, a birth). At most twice per film.
+const flash = H => H.knock(rect(-50, -50, FW + 50, FH + 50));
+// flicker(f, period): true on alternating runs of `period` frames, to alternate two renders of the same shot
+const flicker = (f, period = 2) => Math.floor(f / period) % 2 === 0;
+// montage(cards, lf, per): the card to show at local frame lf, one card per `per` frames (6 = four per second)
+const montage = (cards, lf, per = 6) => cards[Math.min(cards.length - 1, Math.floor(lf / per))];
+// stamp: render a card once, through a real hand, into a small canvas, and reuse it as an image (badges, thumbnails)
+const stampCache = new Map();
+function stamp(key, draw, variant = 0, size = 360) { const k = key + '|' + variant + '|' + size + '|' + SEED + '|' + INKS.map(i => INK[i].join('.')).join('/'); let cv = stampCache.get(k); if (cv) return cv;
+  cv = document.createElement('canvas'); cv.width = size; cv.height = Math.round(size * FH / FW); const c = cv.getContext('2d'); c.setTransform(size / FW, 0, 0, size / FW, 0, 0); c.fillStyle = rgb(PAPER); c.fillRect(0, 0, FW, FH);
+  try { draw(mkHand(c, variant), streamOf('stamp', key)); } catch (e) { report('stamp ' + key, e); } stampCache.set(k, cv); return cv; }
+// badges: every card as a round print on concentric dashed rings: the flipbook's gallery.
+// cards: [{ key, draw(H, R) }]. progress 0..1 grows the badges; scale shrinks the whole gallery toward its centre.
+function badges(H, R, cards, o = {}) { const cx = o.x ?? CX, cy = o.y ?? CY, base = o.size ?? 52, gap = o.gap ?? 118, r0 = o.r0 ?? 40, ink = o.ink || INKS[0], k0 = o.scale ?? 1, s = base * (o.progress ?? 1) * k0; let placed = 0, k = 1;
+  while (placed < cards.length && k < 9) { const rad = r0 + k * gap, n = Math.min(cards.length - placed, Math.max(5, Math.round(TAU * rad / (base * 2.5))));
+    H.line(circ(cx, cy, rad * k0, 90), ink, 1.5, { closed: true, dash: [14, 10], amp: .8, tone: .7 });
+    for (let j = 0; j < n; j++, placed++) { if (s < 1) continue; const a = j / n * TAU + k * .5, x = cx + Math.cos(a) * rad * k0, y = cy + Math.sin(a) * rad * k0, P = circ(x, y, s, 28), cv = stamp(cards[placed].key, cards[placed].draw, H.variant), ar = cv.width / cv.height, w = ar >= 1 ? 2 * s * ar : 2 * s, h = ar >= 1 ? 2 * s : 2 * s / ar;
+      H.clip(P, () => H.image(cv, x - w / 2, y - h / 2, w, h)); H.line(P, ink, 2.6, { closed: true, amp: .8 }); }
+    k++; } }
+
+// ---- LETTERING -------------------------------------------------------------
+// A single-stroke alphabet drawn through H.line, so text wobbles and prints like everything else and is
+// identical on every machine (no fonts). y = 1 is the baseline, .5 the x-height, descenders reach 1.35.
+//   write(H, R, text, x, y, size, {center, n, ink, w, tone})   n limits the letters drawn, for writing-on
+//   measure(text, size) -> width.   Lower case, digits and . , - ' ! ? : only.
+const GLYPH={};const G=(c,w,...s)=>GLYPH[c]={w,s};
+G('a',.55,[[.45,.55],[.25,.5],[.08,.7],[.12,.95],[.3,1.02],[.45,.9]],[[.45,.5],[.46,1]]);
+G('b',.55,[[.1,.05],[.1,1]],[[.1,.62],[.3,.5],[.47,.62],[.48,.88],[.3,1.02],[.1,.92]]);
+G('c',.5,[[.45,.6],[.3,.5],[.1,.62],[.08,.9],[.3,1.02],[.45,.9]]);
+G('d',.55,[[.46,.05],[.46,1]],[[.46,.62],[.28,.5],[.1,.62],[.08,.88],[.28,1.02],[.46,.92]]);
+G('e',.52,[[.08,.78],[.45,.75],[.42,.55],[.25,.5],[.08,.65],[.08,.9],[.27,1.02],[.45,.93]]);
+G('f',.4,[[.4,.12],[.3,.05],[.2,.15],[.18,1]],[[.05,.5],[.35,.5]]);
+G('g',.55,[[.45,.55],[.25,.5],[.08,.7],[.12,.95],[.3,1.02],[.45,.9]],[[.45,.5],[.46,1.15],[.35,1.33],[.12,1.3]]);
+G('h',.55,[[.1,.05],[.1,1]],[[.1,.65],[.28,.5],[.45,.6],[.46,1]]);
+G('i',.25,[[.12,.52],[.13,1]],[[.12,.3],[.13,.34]]);
+G('j',.3,[[.22,.52],[.22,1.15],[.12,1.35],[0,1.3]],[[.22,.3],[.23,.34]]);
+G('k',.5,[[.1,.05],[.1,1]],[[.42,.52],[.12,.78]],[[.2,.7],[.44,1.02]]);
+G('l',.28,[[.13,.05],[.13,.92],[.25,1.02]]);
+G('m',.8,[[.08,1],[.08,.52]],[[.08,.65],[.22,.5],[.36,.6],[.37,1]],[[.37,.65],[.5,.5],[.65,.6],[.66,1]]);
+G('n',.55,[[.08,1],[.08,.52]],[[.08,.65],[.25,.5],[.43,.6],[.44,1]]);
+G('o',.55,[[.28,.5],[.1,.62],[.08,.88],[.28,1.02],[.46,.9],[.47,.62],[.28,.5]]);
+G('p',.55,[[.1,.52],[.1,1.35]],[[.1,.62],[.3,.5],[.48,.62],[.48,.88],[.3,1.02],[.1,.92]]);
+G('r',.4,[[.1,1],[.1,.52]],[[.1,.68],[.22,.52],[.38,.52]]);
+G('s',.45,[[.4,.56],[.24,.5],[.1,.6],[.2,.74],[.36,.8],[.4,.92],[.24,1.02],[.06,.94]]);
+G('t',.4,[[.2,.2],[.2,.92],[.34,1.02]],[[.05,.5],[.38,.5]]);
+G('u',.55,[[.08,.52],[.08,.9],[.22,1.02],[.4,.92],[.44,.52]],[[.44,.62],[.46,1]]);
+G('v',.5,[[.06,.52],[.25,1],[.44,.52]]);
+G('w',.7,[[.04,.52],[.18,1],[.34,.62],[.5,1],[.64,.52]]);
+G('x',.5,[[.06,.52],[.44,1]],[[.44,.52],[.06,1]]);
+G('y',.5,[[.06,.52],[.26,1]],[[.46,.52],[.24,1.14],[.06,1.32]]);
+G('1',.3,[[.05,.28],[.2,.1],[.2,1]]);
+G('5',.5,[[.42,.12],[.12,.12],[.1,.5],[.28,.44],[.44,.58],[.43,.86],[.26,1],[.06,.93]]);
+G('.',.2,[[.1,.95],[.12,.98]]);
+G(' ',.35);
+// the rest of the alphabet, digits and light punctuation, so any sign-off can be written without a font
+G('q',.55,[[.45,.55],[.25,.5],[.08,.7],[.12,.95],[.3,1.02],[.45,.9]],[[.45,.5],[.46,1.3],[.56,1.2]]);
+G('z',.48,[[.06,.52],[.42,.52],[.06,1],[.44,1]]);
+G('0',.52,[[.26,.12],[.1,.3],[.08,.8],[.26,1],[.43,.8],[.44,.3],[.26,.12]]);
+G('2',.5,[[.08,.32],[.18,.14],[.36,.14],[.42,.34],[.07,1],[.45,1]]);
+G('3',.5,[[.08,.2],[.26,.12],[.42,.26],[.26,.52],[.43,.72],[.28,1],[.07,.9]]);
+G('4',.5,[[.36,1],[.36,.12],[.06,.72],[.46,.72]]);
+G('6',.5,[[.38,.12],[.18,.36],[.09,.7],[.2,.98],[.38,.94],[.44,.72],[.3,.58],[.11,.68]]);
+G('7',.48,[[.06,.14],[.44,.14],[.2,1]]);
+G('8',.5,[[.26,.54],[.1,.36],[.26,.12],[.42,.36],[.26,.54],[.08,.78],[.26,1],[.44,.78],[.26,.54]]);
+G('9',.5,[[.42,.42],[.26,.56],[.1,.4],[.24,.12],[.42,.3],[.42,.6],[.3,1]]);
+G(',',.22,[[.14,.9],[.15,1.02],[.04,1.16]]);
+G('-',.4,[[.05,.72],[.36,.7]]);
+G("'",.18,[[.12,.08],[.09,.28]]);
+G('!',.24,[[.12,.08],[.12,.72]],[[.12,.94],[.13,.98]]);
+G('?',.44,[[.08,.28],[.18,.1],[.36,.12],[.4,.32],[.24,.5],[.24,.72]],[[.24,.94],[.26,.98]]);
+G(':',.22,[[.1,.58],[.12,.61]],[[.1,.94],[.12,.97]]);
+G('#',.56,[[.2,.2],[.12,1]],[[.42,.2],[.34,1]],[[.04,.45],[.52,.45]],[[.02,.76],[.5,.76]]);
+G('@',.78,[[.5,.62],[.4,.5],[.26,.56],[.22,.76],[.34,.88],[.48,.8],[.5,.5],[.5,.82],[.6,.9],[.7,.72],[.66,.4],[.46,.22],[.22,.3],[.08,.56],[.12,.9],[.34,1.08],[.6,1.04]]);
+G('&',.62,[[.56,1],[.2,.4],[.22,.2],[.34,.14],[.42,.26],[.12,.7],[.14,.92],[.3,1.02],[.46,.9],[.56,.64]]);
+G('/',.4,[[.34,.08],[.04,1.1]]);
+G('+',.46,[[.05,.7],[.41,.7]],[[.23,.5],[.23,.9]]);
+function measure(t,sz){let x=0;for(const c of t)x+=((GLYPH[c]||GLYPH[' ']).w+.08)*sz;return x-.08*sz}
+function write(H,R,t,x,y,sz,o={}){let px=o.center?x-measure(t,sz)/2:x;const n=o.n??t.length,k=o.ink||INKS[0],w=o.w||Math.max(1.4,sz*.075),ph=rd(R,0,7);
+ for(let i=0;i<t.length;i++){const c=t[i],g=GLYPH[c]||GLYPH[' '];
+  if(i<n)for(const s of g.s||[]){const yb=y+Math.sin(i*.8+ph)*sz*.03;H.line(s.map(p=>[px+(p[0]+(1-p[1])*.12)*sz,yb+(p[1]-1)*sz]),k,w,{amp:Math.min(.7,sz*.02),tone:o.tone??1})}
+  px+=(g.w+.08)*sz}}
+
+// ---- SOUND -----------------------------------------------------------------
+// The score is code too. This section (KIT and EFFECTS) is the same source as the webaudio-sound-design skill,
+// so a score(K, TL) written for a film also runs there, and the other way round.
+
+// ---- KIT -------------------------------------------------------------------
+// One timeline converts beats and frames to seconds. makeKit gives instruments over ANY AudioContext, so the same
+// score(K, TL) plays live and renders offline. Two buses, K.music and K.sfx, feed one master with a gentle
+// compressor; rendering with { solo: 'music' | 'sfx' } gives stems. A seeded reverb sits on each bus (option `send`).
+// Rule that makes sound land on picture: schedule every cue from the same data the picture reads.
+const timeline = (bpm, fps = 24) => ({ bpm, fps, bar: 240 / bpm, beat: b => (b - 1) * 60 / bpm, frame: f => f / fps, beatFrame: b => Math.round((b - 1) * 60 / bpm * fps), bars: n => n * 240 / bpm });
+const NOTE = (() => { const names = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b'], o = {}; for (let oct = 1; oct <= 7; oct++) names.forEach((n, i) => { o[n + oct] = 440 * Math.pow(2, (i - 9) / 12 + (oct - 4)); }); return o; })();   // NOTE.c4, NOTE['f#5']
+const midiOf = n => { if (typeof n === 'number') return n; const m = /^([a-g])(#|b)?(-?\d)$/.exec(String(n).toLowerCase()); if (!m) { report('note', new Error('not a note name: ' + n)); return 60; } return { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 }[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + (+m[3] + 1) * 12; };
+const hzOf = n => 440 * Math.pow(2, (midiOf(n) - 69) / 12);
+const SCALES = { major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10], pentatonic: [0, 2, 4, 7, 9], minorPentatonic: [0, 3, 5, 7, 10], dorian: [0, 2, 3, 5, 7, 9, 10], lydian: [0, 2, 4, 6, 7, 9, 11], blues: [0, 3, 5, 6, 7, 10], wholeTone: [0, 2, 4, 6, 8, 10] };
+const CHORDS = { maj: [0, 4, 7], min: [0, 3, 7], sus2: [0, 2, 7], sus4: [0, 5, 7], maj7: [0, 4, 7, 11], min7: [0, 3, 7, 10], dom7: [0, 4, 7, 10], dim: [0, 3, 6], add9: [0, 4, 7, 14] };
+// scaleOf('c4', 'pentatonic', 2) -> ascending Hz over two octaves, ending on the top root.  chordOf('a3', 'min') -> Hz
+const scaleOf = (root, name = 'pentatonic', octaves = 2) => { const r = midiOf(root), st = SCALES[name] || SCALES.pentatonic, out = []; for (let o = 0; o < octaves; o++) for (const s of st) out.push(hzOf(r + 12 * o + s)); out.push(hzOf(r + 12 * octaves)); return out; };
+const chordOf = (root, kind = 'maj') => (CHORDS[kind] || CHORDS.maj).map(s => hzOf(midiOf(root) + s));
+// phraseOf(R, notes, n): a seeded melodic walk, mostly steps and now and then a leap. Varied, and identical on every render.
+function phraseOf(R, notes, n, o = {}) { let i = o.start ?? Math.floor(notes.length / 2); const out = []; for (let k = 0; k < n; k++) { out.push(notes[i]); i = clamp(i + (ch(R, o.leap ?? .2) ? ri(R, -3, 3) : ri(R, -1, 1)), 0, notes.length - 1); } return out; }
+
+function makeKit(ac, t0 = 0, o = {}) {
+  if (typeof o === 'number') o = { gain: o };
+  const master = ac.createGain(); master.gain.value = o.gain ?? .85;
+  const comp = ac.createDynamicsCompressor(); comp.threshold.value = -12; comp.ratio.value = 4; comp.attack.value = .003; comp.release.value = .25;
+  // a soft clipper after the compressor: exactly linear below 0.6 (-4.4 dBFS), then a rounded knee with a ceiling of 0.89
+  // (-1 dBFS), so a hot moment is squeezed instead of being chopped flat, and lossy encoders keep their headroom. A mix that
+  // lives above the knee distorts: check-audio.mjs measures how much of it does. No oversampling: that would add latency.
+  const pre = ac.createGain(), clip = ac.createWaveShaper(), cN = 2049, curve = new Float32Array(cN); pre.gain.value = .5; for (let i = 0; i < cN; i++) { const x = i / (cN - 1) * 4 - 2, m = Math.abs(x); curve[i] = Math.sign(x) * (m < .6 ? m : .6 + .29 * Math.tanh((m - .6) / .29)); }
+  clip.curve = curve; master.connect(comp); comp.connect(pre); pre.connect(clip); clip.connect(ac.destination);
+  const music = ac.createGain(), sfx = ac.createGain(); music.connect(master); sfx.connect(master);
+  if (o.solo === 'music') sfx.gain.value = 0; if (o.solo === 'sfx') music.gain.value = 0;
+  const sr = ac.sampleRate, NR = streamOf('noise'), n = Math.floor(sr * 2), nb = ac.createBuffer(1, n, sr), nd = nb.getChannelData(0); for (let i = 0; i < n; i++) nd[i] = NR() * 2 - 1;   // seeded noise: the WAV is deterministic
+  const irN = Math.floor(sr * (o.reverbSeconds ?? 1.8)), ir = ac.createBuffer(2, irN, sr); for (let c = 0; c < 2; c++) { const R = streamOf('ir', c), d = ir.getChannelData(c); for (let i = 0; i < irN; i++) d[i] = (R() * 2 - 1) * Math.pow(1 - i / irN, 2.6); }
+  const wet = {}; for (const [name, bus] of [['music', music], ['sfx', sfx]]) { const cv = ac.createConvolver(); cv.buffer = ir; const g = ac.createGain(); g.gain.value = o.reverb ?? .9; cv.connect(g); g.connect(bus); wet[name] = cv; }
+  const K = { ac, master, music, sfx, at: t => t0 + Math.max(0, t) };
+  // out(node, opts, defaultBus): connect to a bus, plus a reverb send when opts.send > 0
+  const out = (node, q, dflt) => { const b = q.bus === 'music' || q.bus === 'sfx' ? q.bus : dflt; node.connect(b === 'music' ? music : sfx); if (q.send > 0) { const s = ac.createGain(); s.gain.value = q.send; node.connect(s); s.connect(wet[b]); } };
+  K.out = out;
+  // K.noise(t, dur, {type, f0, f1, path, q, g, a, hold, R, bus='sfx', send}): filtered noise; f1 sweeps the filter, or path [[0..1, hz], ...]
+  // draws its course; hold keeps the level before the decay; R (a stream) picks where in the noise it starts
+  K.noise = (t, dur, q = {}) => { t = K.at(t); const s = ac.createBufferSource(); s.buffer = nb; s.loop = true; const f = ac.createBiquadFilter(); f.type = q.type || 'bandpass'; f.frequency.setValueAtTime(q.f0 ?? 2000, t); if (q.f1 !== undefined) f.frequency.exponentialRampToValueAtTime(Math.max(20, q.f1), t + dur); if (q.path) for (const [u, hz] of q.path) f.frequency.linearRampToValueAtTime(Math.max(20, hz), t + u * dur); f.Q.value = q.q ?? .8;
+    const g = ac.createGain(), a = q.a ?? .005, lvl = q.g ?? .3; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(lvl, t + a); if (q.hold) g.gain.setValueAtTime(lvl, t + a + q.hold); g.gain.exponentialRampToValueAtTime(.0005, t + dur);
+    s.connect(f); f.connect(g); out(g, q, 'sfx'); s.start(t, q.R ? rd(q.R, 0, 1.5) : 0); s.stop(t + dur + .05); return g; };
+  // K.tone(t, dur, hz, {type, f1, fd, g, a, hold, lp, bus='music', send}): one enveloped oscillator; f1 glides the pitch over fd seconds
+  K.tone = (t, dur, hz, q = {}) => { t = K.at(t); const osc = ac.createOscillator(); osc.type = q.type || 'triangle'; osc.frequency.setValueAtTime(hz, t); if (q.f1) osc.frequency.exponentialRampToValueAtTime(q.f1, t + (q.fd ?? dur));
+    const g = ac.createGain(), a = q.a ?? .006, lvl = q.g ?? .25; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(lvl, t + a); if (q.hold) g.gain.setValueAtTime(lvl, t + a + q.hold); g.gain.exponentialRampToValueAtTime(.0005, t + dur);
+    let node = osc; if (q.lp) { const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = q.lp; osc.connect(lp); node = lp; } node.connect(g); out(g, q, 'music'); osc.start(t); osc.stop(t + dur + .05); return g; };
+  // K.voice(t, dur, hz, {type, f1, path, am:{hz, depth}, vib:{hz, depth, decay}, lp, g, a, r, bus='sfx', send}): an oscillator with tremolo
+  // and vibrato and a soft attack and release: throats, engines, insects, cartoon springs
+  K.voice = (t, dur, hz, q = {}) => { t = K.at(t); const osc = ac.createOscillator(); osc.type = q.type || 'sawtooth'; osc.frequency.setValueAtTime(hz, t); if (q.f1) osc.frequency.exponentialRampToValueAtTime(q.f1, t + dur); if (q.path) for (const [u, f] of q.path) osc.frequency.linearRampToValueAtTime(Math.max(1, f), t + u * dur);
+    if (q.vib) { const l = ac.createOscillator(), lg = ac.createGain(); l.frequency.value = q.vib.hz; lg.gain.setValueAtTime(q.vib.depth, t); if (q.vib.decay) lg.gain.exponentialRampToValueAtTime(Math.max(.01, q.vib.depth * .02), t + dur); l.connect(lg); lg.connect(osc.frequency); l.start(t); l.stop(t + dur + .05); }
+    let node = osc; if (q.am) { const vca = ac.createGain(), l = ac.createOscillator(), lg = ac.createGain(); vca.gain.value = 1 - q.am.depth / 2; l.frequency.value = q.am.hz; lg.gain.value = q.am.depth / 2; l.connect(lg); lg.connect(vca.gain); osc.connect(vca); node = vca; l.start(t); l.stop(t + dur + .05); }
+    if (q.lp) { const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = q.lp; node.connect(lp); node = lp; }
+    const env = ac.createGain(), a = q.a ?? .02, r = q.r ?? Math.min(.2, dur * .4), lvl = q.g ?? .3; env.gain.setValueAtTime(0, t); env.gain.linearRampToValueAtTime(lvl, t + a); env.gain.setValueAtTime(lvl, t + Math.max(a, dur - r)); env.gain.linearRampToValueAtTime(0, t + dur);
+    node.connect(env); out(env, q, 'sfx'); osc.start(t); osc.stop(t + dur + .05); return env; };
+  // ---- instruments (music bus). Every pitched one is (t, hz, gain, dur), so K.arp and your own loops can swap them freely.
+  K.kick = (t, g = .9) => K.tone(t, .28, 150, { type: 'sine', f1: 42, fd: .12, g, a: .002 });
+  K.snare = (t, g = .35) => { K.noise(t, .16, { type: 'highpass', f0: 1800, g, a: .002, bus: 'music', send: .1 }); K.tone(t, .1, 220, { type: 'triangle', f1: 140, fd: .08, g: g * .6, a: .002 }); };
+  K.clap = (t, g = .3) => { for (const d of [0, .012, .026]) K.noise(t + d, .09, { type: 'bandpass', f0: 1500, q: 1.2, g, a: .001, bus: 'music', send: .15 }); };
+  K.hat = (t, g = .1, R) => K.noise(t, .05, { type: 'highpass', f0: 7000, g, R, bus: 'music' });
+  K.pluck = (t, hz, g = .22, dur = .55) => { K.tone(t, dur, hz, { type: 'triangle', g, lp: 2600, send: .18 }); K.tone(t, dur * .5, hz * 2, { type: 'sine', g: g * .25 }); };
+  K.keys = (t, hz, g = .16, dur = .9) => { K.tone(t, dur, hz, { type: 'sine', g, a: .008, send: .25 }); K.tone(t, dur * .7, hz * 2, { type: 'triangle', g: g * .22, a: .008, lp: 3000 }); };
+  K.bass = (t, hz, g = .3, dur = .4) => K.tone(t, dur, hz, { type: 'sawtooth', g, a: .006, lp: 420, hold: dur * .4 });
+  K.bell = (t, hz, g = .2) => { t = K.at(t); const c = ac.createOscillator(), m = ac.createOscillator(), mg = ac.createGain(), g1 = ac.createGain(); c.frequency.value = hz; m.frequency.value = hz * 3.47; mg.gain.setValueAtTime(hz * 1.6, t); mg.gain.exponentialRampToValueAtTime(1, t + 1.4); m.connect(mg); mg.connect(c.frequency);
+    g1.gain.setValueAtTime(0, t); g1.gain.linearRampToValueAtTime(g, t + .004); g1.gain.exponentialRampToValueAtTime(.0005, t + 2.4); c.connect(g1); out(g1, { send: .3 }, 'music'); c.start(t); m.start(t); c.stop(t + 2.5); m.stop(t + 2.5); };
+  K.pad = (t, dur, freqs, g = .06) => { t = K.at(t); for (const f of freqs) for (const det of [-5, 5]) { const os = ac.createOscillator(); os.type = 'sawtooth'; os.frequency.value = f; os.detune.value = det; const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; lp.Q.value = .5;
+    const gn = ac.createGain(); gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(g, t + Math.min(.5, dur * .4)); gn.gain.setValueAtTime(g, t + Math.max(.5, dur - .6)); gn.gain.linearRampToValueAtTime(0, t + dur); os.connect(lp); lp.connect(gn); out(gn, { send: .2 }, 'music'); os.start(t); os.stop(t + dur + .05); } };
+  K.arp = (t, notes, step, q = {}) => notes.forEach((hz, i) => (q.inst || K.pluck)(t + i * step, hz, q.g ?? .18, q.dur ?? step * 1.8));
+  // two small effects kept on the kit because every score uses them (sfx bus)
+  K.plink = (t, hz, g = .09) => K.tone(t, .09, hz, { type: 'sine', f1: hz * .7, fd: .09, g, a: .001, bus: 'sfx', send: .12 });
+  K.whoosh = (t, dur, g = .18) => K.noise(t, dur, { type: 'bandpass', f0: 400, f1: 1800, q: .7, g, a: dur * .4 });
+  attachEffects(K);
+  return K;
+}
+// Offline rendering, with a pre-roll. Measured in Chrome: the compressor node starts closed and needs about 0.2 s to open (a
+// burst at time 0 comes out 13.5 dB quieter than the same burst at 0.5 s, with only silence before it), and it delays the signal
+// by 6 ms. So the kit's clock starts half a second in, and that half second plus the delay is cut off afterwards. Sounds at
+// time 0 then have their full level and every sound lands on its sample. The delay is measured once, not assumed, so another
+// browser engine gets its own number. Never render a score through a bare OfflineAudioContext: use this.
+let kitDelay = null;
+function measureKitDelay() { if (!kitDelay) kitDelay = (async () => { try { const SR = 48000, ac = new OfflineAudioContext(1, SR / 4, SR), c = ac.createDynamicsCompressor(), b = ac.createBuffer(1, 4, SR), s = ac.createBufferSource(); b.getChannelData(0)[0] = 1; s.buffer = b; s.connect(c); c.connect(ac.destination); s.start(.1);
+  const x = (await ac.startRendering()).getChannelData(0); let pk = 0, at = SR * .1; for (let i = 0; i < x.length; i++) if (Math.abs(x[i]) > pk) { pk = Math.abs(x[i]); at = i; } return clamp(at - SR * .1, 0, SR * .05); } catch (e) { return 288; } })(); return kitDelay; }
+async function renderOffline(seconds, fill, o = {}) { const SR = 48000, PRE = SR / 2, lat = await measureKitDelay(), n = Math.ceil(SR * seconds), ac = new OfflineAudioContext(2, n + PRE + lat, SR); fill(makeKit(ac, .5, o));
+  const full = await ac.startRendering(), cut = new AudioBuffer({ length: n, numberOfChannels: 2, sampleRate: SR }); for (let c = 0; c < 2; c++) cut.getChannelData(c).set(full.getChannelData(c).subarray(PRE + lat, PRE + lat + n)); return cut; }
+function encodeWav(buf) { const n = buf.length, chn = buf.numberOfChannels, sr = buf.sampleRate, bytes = 44 + n * chn * 2, ab = new ArrayBuffer(bytes), v = new DataView(ab), Wr = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  Wr(0, 'RIFF'); v.setUint32(4, bytes - 8, true); Wr(8, 'WAVE'); Wr(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, chn, true); v.setUint32(24, sr, true); v.setUint32(28, sr * chn * 2, true); v.setUint16(32, chn * 2, true); v.setUint16(34, 16, true); Wr(36, 'data'); v.setUint32(40, n * chn * 2, true);
+  const chans = []; for (let c = 0; c < chn; c++) chans.push(buf.getChannelData(c)); let o = 44; for (let i = 0; i < n; i++) for (let c = 0; c < chn; c++) { const x = Math.max(-1, Math.min(1, chans[c][i])); v.setInt16(o, x < 0 ? x * 32768 : x * 32767, true); o += 2; }
+  const u8 = new Uint8Array(ab); let s = ''; for (let i = 0; i < u8.length; i += 8192) s += String.fromCharCode.apply(null, u8.subarray(i, i + 8192)); return btoa(s); }
+
+// ---- EFFECTS ---------------------------------------------------------------
+// A library of sound effects built only from the kit's three primitives. Every one is K.fx.name(t, ...) with t in
+// seconds from the start of the score, and every argument after t has a default. Textured effects (rain, crinkle,
+// sparkle, ...) take an optional seeded stream R as their LAST argument; without one they seed themselves from
+// their own name and start time, so a render is always repeatable. All effects play on the sfx bus.
+// A cue that must pass a sync gate needs a LOUD FIRST FIFTH OF A SECOND, because that is the window the gate measures.
+// boom, thunder, splash, heartbeat, croak, beep and clang have it; whoosh, swish, wind, wave, riser, crinkle and scribble
+// swell or sputter and do not, so pair them with K.fx.thump on the cue. references/recipes.md has the measured table.
+function attachEffects(K) {
+  const X = {}, S = (R, name, t) => R || streamOf('fx', name, Math.round(t * 1000)), T = (t, dur, hz, q) => K.tone(t, dur, hz, { bus: 'sfx', ...q });
+  // impacts
+  X.thump = (t, g = .5, hz = 90) => T(t, .22, hz * 1.6, { type: 'sine', f1: hz * .5, fd: .1, g, a: .002 });
+  X.knock = (t, g = .4, hz = 420) => { T(t, .07, hz, { type: 'sine', f1: hz * .6, fd: .05, g, a: .001 }); K.noise(t, .03, { type: 'bandpass', f0: hz * 3, q: 2, g: g * .5, a: .001 }); };
+  X.clang = (t, g = .25, hz = 520) => { for (const [m, d] of [[1, 1.2], [2.76, .8], [5.4, .5], [8.93, .3]]) T(t, d, hz * m, { type: 'sine', g: g / Math.sqrt(m), a: .001, send: .25 }); K.noise(t, .04, { type: 'highpass', f0: 3000, g: g * .6, a: .001 }); };
+  X.boom = (t, g = .7) => { T(t, 1.2, 70, { type: 'sine', f1: 28, fd: .6, g, a: .004, send: .3 }); K.noise(t, .9, { type: 'lowpass', f0: 900, f1: 80, g: g * .6, a: .004, send: .3 }); };
+  X.heartbeat = (t, g = .5) => { X.thump(t, g, 60); X.thump(t + .16, g * .7, 50); };
+  X.footstep = (t, g = .3, R) => { R = S(R, 'footstep', t); T(t, .09, rd(R, 95, 125), { type: 'sine', f1: 60, fd: .06, g, a: .002 }); K.noise(t, .06, { type: 'bandpass', f0: rd(R, 700, 1300), q: 1, g: g * .45, a: .002, R }); };
+  // water
+  X.plop = (t, g = .4, hz = 320) => { T(t, .14, hz, { type: 'sine', f1: hz * 2.6, fd: .1, g, a: .004, send: .12 }); K.noise(t, .05, { type: 'bandpass', f0: 1800, q: 1.5, g: g * .25, a: .002 }); };
+  X.drip = (t, g = .25, hz = 900) => T(t, .09, hz, { type: 'sine', f1: hz * 1.9, fd: .06, g, a: .002, send: .25 });
+  X.splash = (t, g = .45, R) => { R = S(R, 'splash', t); X.thump(t, g * .9, 80); K.noise(t, .55, { type: 'bandpass', f0: 900, f1: 3800, q: .6, g, a: .01, send: .15 }); K.noise(t + .06, .7, { type: 'highpass', f0: 4200, g: g * .4, a: .05 }); for (let i = 0; i < 5; i++) X.drip(t + rd(R, .15, .7), g * rd(R, .15, .3), rd(R, 700, 1500)); };
+  X.bubbles = (t, dur = 1, g = .2, R) => { R = S(R, 'bubbles', t); for (let x = 0; x < dur; x += rd(R, .05, .16)) { const hz = rd(R, 300, 900); T(t + x, .07, hz, { type: 'sine', f1: hz * rd(R, 1.5, 2.2), fd: .05, g: g * rd(R, .4, 1), a: .004 }); } };
+  X.rain = (t, dur = 4, g = .16, R) => { R = S(R, 'rain', t); const a = Math.min(1, dur * .25); K.noise(t, dur, { type: 'highpass', f0: 3500, g, a, hold: dur * .6 }); K.noise(t, dur, { type: 'bandpass', f0: 1100, q: .4, g: g * .5, a, hold: dur * .6 });
+    for (let x = 0; x < dur; x += rd(R, .03, .12)) K.noise(t + x, .025, { type: 'bandpass', f0: rd(R, 2500, 7000), q: 3, g: g * rd(R, .3, .9), a: .001, R }); };
+  X.wave = (t, dur = 3, g = .25) => { K.noise(t, dur, { type: 'lowpass', f0: 300, f1: 1600, g, a: dur * .55 }); K.noise(t + dur * .5, dur * .7, { type: 'highpass', f0: 2500, g: g * .45, a: dur * .15 }); };
+  // air
+  X.whoosh = (t, dur = .5, g = .18) => K.whoosh(t, dur, g);
+  X.swish = (t, g = .2) => K.noise(t, .18, { type: 'bandpass', f0: 1200, f1: 5200, q: 1.2, g, a: .07 });
+  X.wind = (t, dur = 4, g = .14, R) => { R = S(R, 'wind', t); for (const [base, q] of [[420, 1.6], [900, 2.4]]) { const path = []; for (let u = .1; u < 1; u += rd(R, .08, .2)) path.push([u, base * rd(R, .6, 1.9)]); K.noise(t, dur, { type: 'bandpass', f0: base, path, q, g: g * (base < 500 ? 1 : .5), a: dur * .25, hold: dur * .5, R }); } };
+  X.hiss = (t, dur = 1, g = .12) => K.noise(t, dur, { type: 'highpass', f0: 5000, g, a: dur * .2, hold: dur * .5 });
+  X.thunder = (t, g = .6, R) => { R = S(R, 'thunder', t); K.noise(t, .12, { type: 'highpass', f0: 1800, g: g * .7, a: .002 }); K.noise(t + .03, 2.6, { type: 'lowpass', f0: 420, f1: 60, g, a: .02, send: .4 }); T(t + .03, 1.6, 55, { type: 'sine', f1: 30, fd: 1.2, g: g * .6, a: .01 });
+    for (let i = 0; i < 4; i++) K.noise(t + rd(R, .3, 1.8), rd(R, .5, .9), { type: 'lowpass', f0: rd(R, 120, 260), g: g * rd(R, .3, .6), a: .08, R, send: .3 }); };
+  // paper and friction
+  X.crinkle = (t, dur = .5, g = .2, R) => { R = S(R, 'crinkle', t); for (let x = 0; x < dur; x += rd(R, .012, .06)) K.noise(t + x, rd(R, .01, .03), { type: 'bandpass', f0: rd(R, 2000, 6500), q: rd(R, 1, 4), g: g * rd(R, .3, 1), a: .001, R }); };
+  X.tear = (t, dur = .5, g = .22, R) => { R = S(R, 'tear', t); K.noise(t, dur, { type: 'bandpass', f0: 1500, f1: 4200, q: .8, g: g * .7, a: .02, hold: dur * .6 }); for (let x = 0; x < dur; x += rd(R, .008, .03)) K.noise(t + x, .012, { type: 'highpass', f0: rd(R, 3000, 7000), g: g * rd(R, .3, .8), a: .001, R }); };
+  X.scribble = (t, dur = .8, g = .2, R) => { R = S(R, 'scribble', t); for (let x = 0; x < dur;) { const d = rd(R, .06, .16); K.noise(t + x, d, { type: 'bandpass', f0: rd(R, 1800, 2600), f1: rd(R, 2600, 4200), q: 1.6, g: g * rd(R, .6, 1), a: d * .3, R }); x += d + rd(R, .01, .05); } };
+  X.stamp = (t, g = .4) => { X.thump(t, g, 110); K.noise(t, .05, { type: 'bandpass', f0: 2400, q: 1, g: g * .4, a: .001 }); };
+  // creatures
+  X.croak = (t, g = .3, hz = 110, dur = .32) => K.voice(t, dur, hz, { type: 'sawtooth', f1: hz * .8, am: { hz: 38, depth: .9 }, lp: 900, g, a: .02 });
+  X.chirp = (t, g = .18, hz = 3200, n = 3) => { for (let i = 0; i < n; i++) T(t + i * .085, .06, hz, { type: 'sine', f1: hz * 1.35, fd: .04, g, a: .004, send: .15 }); };
+  X.buzz = (t, dur = .8, g = .12, hz = 190) => K.voice(t, dur, hz, { type: 'sawtooth', am: { hz: 27, depth: .6 }, vib: { hz: 6, depth: hz * .04 }, lp: 1800, g, a: .08, r: .15 });
+  X.hoot = (t, g = .3, hz = 330) => { for (const [d, len] of [[0, .22], [.3, .5]]) K.voice(t + d, len, hz, { type: 'sine', f1: hz * .9, vib: { hz: 5, depth: 4 }, g, a: .05, r: len * .5, send: .3 }); };
+  X.purr = (t, dur = 1.5, g = .2) => K.voice(t, dur, 55, { type: 'sawtooth', am: { hz: 24, depth: .95 }, lp: 380, g, a: .2, r: .4 });
+  // interface
+  X.click = (t, g = .25) => { K.noise(t, .012, { type: 'highpass', f0: 2500, g, a: .0005 }); T(t, .02, 1900, { type: 'sine', g: g * .5, a: .0005 }); };
+  X.tick = (t, g = .3, hz = 2400) => T(t, .03, hz, { type: 'square', g: g * .5, a: .0005, lp: 5000 });
+  X.pop = (t, g = .35, hz = 500) => T(t, .07, hz, { type: 'sine', f1: hz * 2.4, fd: .035, g, a: .002 });
+  X.blip = (t, g = .3, hz = 880) => T(t, .09, hz, { type: 'square', g: g * .6, a: .002, lp: 3500 });
+  X.beep = (t, dur = .2, g = .2, hz = 1000) => K.voice(t, dur, hz, { type: 'sine', g, a: .005, r: .02 });
+  X.toggle = (t, on = true, g = .2) => { const [a, b] = on ? [660, 990] : [990, 660]; T(t, .06, a, { type: 'sine', g, a: .002 }); T(t + .05, .1, b, { type: 'sine', g, a: .002 }); };
+  X.success = (t, g = .2) => { [NOTE.c5, NOTE.e5, NOTE.g5, NOTE.c6].forEach((hz, i) => T(t + i * .07, .35, hz, { type: 'triangle', g, a: .004, send: .2 })); };
+  X.error = (t, g = .22) => { [[0, 220], [.15, 165]].forEach(([d, hz]) => K.voice(t + d, .13, hz, { type: 'square', lp: 1200, g, a: .004, r: .03 })); };
+  X.notify = (t, g = .2) => { [NOTE.g5, NOTE.c6].forEach((hz, i) => T(t + i * .12, .6, hz, { type: 'sine', g, a: .004, send: .3 })); };
+  X.coin = (t, g = .2) => { T(t, .08, NOTE.b5, { type: 'square', g: g * .6, lp: 6000, a: .002 }); T(t + .08, .4, NOTE.e6, { type: 'square', g: g * .6, lp: 6000, a: .002 }); };
+  X.typing = (t, dur = 1, g = .2, R) => { R = S(R, 'typing', t); for (let x = 0; x < dur; x += rd(R, .07, .19)) { K.noise(t + x, .014, { type: 'highpass', f0: rd(R, 1800, 3200), g: g * rd(R, .6, 1), a: .0005, R }); T(t + x, .03, rd(R, 140, 200), { type: 'sine', g: g * .5, a: .001 }); } };
+  X.shutter = (t, g = .3) => { for (const d of [0, .075]) { K.noise(t + d, .02, { type: 'bandpass', f0: 3200, q: 1.5, g, a: .0005 }); T(t + d, .03, 240, { type: 'sine', g: g * .4, a: .001 }); } };
+  // cartoon and transitions
+  X.riser = (t, dur = 2, g = .2) => { K.noise(t, dur, { type: 'bandpass', f0: 300, f1: 6000, q: 1.2, g, a: dur * .95 }); K.voice(t, dur, 110, { type: 'sawtooth', f1: 880, lp: 2400, g: g * .4, a: dur * .9, r: .03 }); };
+  X.fall = (t, dur = .6, g = .25, hz = 1200) => K.voice(t, dur, hz, { type: 'sine', f1: hz * .15, g, a: .01, r: dur * .3 });
+  X.rise = (t, dur = .6, g = .25, hz = 300) => K.voice(t, dur, hz, { type: 'sine', f1: hz * 5, g, a: .01, r: dur * .3 });
+  X.boing = (t, g = .3, hz = 180, dur = .7) => K.voice(t, dur, hz, { type: 'triangle', f1: hz * 1.5, vib: { hz: 11, depth: hz * .35, decay: true }, g, a: .004, r: dur * .7 });
+  X.zap = (t, g = .22) => K.voice(t, .22, 2400, { type: 'sawtooth', f1: 140, am: { hz: 60, depth: .7 }, lp: 5000, g, a: .002, r: .05 });
+  X.sparkle = (t, dur = .8, g = .1, R) => { R = S(R, 'sparkle', t); const sc = scaleOf('c6', 'pentatonic', 2); for (let x = 0; x < dur; x += rd(R, .04, .1)) T(t + x, .25, pk(R, sc), { type: 'sine', g: g * rd(R, .5, 1), a: .002, send: .35 }); };
+  X.chime = (t, g = .18, hz = NOTE.c6) => { T(t, 1.6, hz, { type: 'sine', g, a: .002, send: .4 }); T(t, .9, hz * 2.76, { type: 'sine', g: g * .4, a: .002, send: .4 }); };
+  // machines
+  X.hum = (t, dur = 2, g = .1, hz = 60) => K.voice(t, dur, hz, { type: 'sawtooth', am: { hz: hz / 8, depth: .2 }, lp: 300, g, a: .2, r: .3 });
+  X.siren = (t, dur = 2, g = .15) => { const path = []; for (let u = 0; u <= 1.001; u += .5 / dur) path.push([Math.min(1, u), path.length % 2 ? 960 : 640]); K.voice(t, dur, 640, { type: 'triangle', path, lp: 3000, g, a: .05, r: .1 }); };
+  X.tickTock = (t, n = 4, g = .3) => { for (let i = 0; i < n; i++) X.tick(t + i * .5, g, i % 2 ? 1700 : 2300); };
+  K.fx = X;
+  K.play = (name, t, ...rest) => X[name] ? X[name](t, ...rest) : report('effect', new Error('no effect named "' + name + '". Known: ' + Object.keys(X).join(' ')));
+}
+
+// ---- RUNTIME ---------------------------------------------------------------
+// defineFilm({
+//   title, fps = 24, bpm = 96, inkset = 'risoTrio' | {...}, cell, look = 'riso',
+//   boilEvery = 0,      frames per boil step. 0 = textures hold still, as in Kevin Ngo's films (measured).
+//                       8 at 24 fps = 3 Hz re-roll of tiles, plates and wobble, which is what his SITE does for a focused room.
+//   hold = 1,           2 = draw "on twos" (each drawing held for two frames): measured in the fruit-fly film;
+//                       the riso flipbook changes nearly every frame. With hold 2, pick a BPM with an even frame count per beat.
+//   grain = true,
+//   scenes: [{ name, frames, draw(H, R, u, f, lf), inkset }],   contiguous; boundaries are the cuts. A scene may print
+//           in its own inkset (a night palette, a duotone via muteInks): ink changes only ever happen on cuts.
+//           H hand · R stream seeded by (seed, scene name) · u 0..1 through the scene · f film frame · lf frame within the scene
+//   score(K, TL),       optional: schedule sound with the kit K at film seconds; TL.beat(b), TL.frame(f)
+//   cues: [{ name, frame, gate }],   declared sync points; check.mjs measures the ones with gate: true
+//   sheet(H, R),        optional: draw every prop once, for ?sheet=props
+// })
+// Hooks for render.mjs / check.mjs: window.__ready, __film, __errors, __frame(i) -> PNG data URL (exact
+// canvas pixels, no screenshot), __grid(n, cell) -> JPEG data URL, __sheet(name) -> PNG data URL,
+// __wav(stem) -> Promise<base64 WAV> of the mix, or of 'music' | 'sfx' alone. Query: ?f=N &s=SEED &ar=16:9 &w=1920 &grid=24 &sheet=swatches|props &bare=1
+let FILM = null, stage = null, sctx = null;
+const sceneAt = f => FILM.scenes.find(s => f >= s.from && f <= s.to) || FILM.scenes[FILM.scenes.length - 1];
+function drawFrame(c, f) {
+  // a look may bring its own cadence: stop motion is shot on twos unless the film says otherwise
+  const s0 = sceneAt(f), hold = FILM.holdSet ? FILM.hold : ((LOOKS[s0.look || FILM.look || 'riso'] || {}).hold || FILM.hold);
+  const ff = Math.floor(f / hold) * hold, boil = FILM.boilEvery > 0 ? Math.floor(ff / FILM.boilEvery) : 0, s = sceneAt(ff);
+  useLook(s.look || FILM.look || 'riso'); useInks(s.inkset || FILM.inkset || 'risoTrio'); const H = mkHand(c, boil, ff);   // the look is set BEFORE the inkset, which may adopt the look's paper
+  c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; c.fillStyle = rgb(PAPER); c.fillRect(0, 0, FW, FH); ground(c);
+  const n = s.to - s.from + 1;
+  try { s.draw(H, streamOf('scene', s.name), (ff - s.from) / n, ff, ff - s.from); } catch (e) { report(s.name + ' f' + ff, e); }
+  c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+  if (FILM.grain !== false) grain(c, H.variant);
+  post(c, ff);
+  return s.name;
+}
+function render(f) { f = clamp(Math.round(num(f, 0)), 0, FRAMES - 1); sctx.setTransform(S, 0, 0, S, 0, 0); const name = drawFrame(sctx, f); sctx.setTransform(1, 0, 0, 1, 0, 0); window.__f = f; return name; }
+function gridSheet(n = 24, cell = 240) { const cols = 6, rows = Math.ceil(n / cols), ch = Math.round(cell * FH / FW), pad = 16, cv = document.createElement('canvas'); cv.width = cols * cell; cv.height = rows * (ch + pad);
+  const g = cv.getContext('2d'); g.fillStyle = '#1b1917'; g.fillRect(0, 0, cv.width, cv.height);
+  for (let k = 0; k < n; k++) { const f = n > 1 ? Math.round(k * (FRAMES - 1) / (n - 1)) : 0, x = (k % cols) * cell, y = Math.floor(k / cols) * (ch + pad);
+    g.save(); g.setTransform(cell / FW, 0, 0, cell / FW, x, y); g.beginPath(); g.rect(0, 0, FW, FH); g.clip(); const name = drawFrame(g, f); g.restore();
+    g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#e8e2d6'; g.font = '11px ui-monospace, Menlo, monospace'; g.fillText(`f${f}  ${(f / FPS).toFixed(2)}s  ${name}`, x + 4, y + ch + 12); }   // labels are debug only; film frames never use fonts
+  return cv; }
+function sheetCanvas(name) { useLook(FILM.look || 'riso'); useInks(FILM.inkset || 'risoTrio'); const cv = document.createElement('canvas'); cv.width = OUT_W; cv.height = OUT_H; const c = cv.getContext('2d'); c.setTransform(S, 0, 0, S, 0, 0); c.fillStyle = rgb(PAPER); c.fillRect(0, 0, FW, FH); const H = mkHand(c, 0), R = streamOf('sheet', name);
+  try { if (name === 'props' && FILM.sheet) FILM.sheet(H, R);
+    else { const m = 60, cw = (FW - 2 * m) / LEVELS;   // swatches: a ramp per ink, every overlap, lines, hatch, glow, lettering
+      INKS.forEach((k, r) => { for (let i = 0; i < LEVELS; i++) H.fill(rect(m + i * cw, m + r * 100, m + i * cw + cw - 4, m + r * 100 + 84), k, (i + 1) / LEVELS); });
+      let y = m + INKS.length * 100 + 20, x = m; for (let i = 0; i < INKS.length; i++) for (let j = i + 1; j < INKS.length; j++) { const P = rect(x, y, x + 110, y + 110); H.fill(P, INKS[i], 1); H.tint(P, INKS[j], 1); x += 130; }
+      if (INKS.length > 2) { const P = rect(x, y, x + 110, y + 110); H.fill(P, INKS[0], 1); H.tint(P, INKS[1], 1); H.tint(P, INKS[2], 1); }
+      y += 150; for (let i = 0; i < 6; i++) H.line([[m, y + i * 34], [FW - m, y + i * 34]], INKS[i % INKS.length], .8 + i * .7, { taper: i > 3 ? 'out' : undefined });
+      y += 300; H.line(circ(m + 110, y, 90, 40), INKS[0], 2, { closed: true }); H.hatch(circ(m + 360, y, 90, 40), INKS[1 % INKS.length], 8, .6, 1); H.glow(m + 620, y, 120, 120, INKS[INKS.length - 1], .7);
+      write(H, R, 'the quick brown fox 0123456789', CX, FH - 90, 34, { center: true }); }
+  } catch (e) { report('sheet ' + name, e); }
+  grain(c, 0); return cv; }
+function defineFilm(def) {
+  if (typeof __checkCore === 'function') __checkCore();   // has the film replaced one of the engine's functions by declaring its own of the same name?
+  if (def.look) useLook(def.look);
+  if (def.inkset) useInks(def.inkset, { cell: def.cell }); else { if (def.cell) { CELL = def.cell; tileCache.clear(); } applyLook(); }
+  FPS = def.fps || 24; const scenes = []; let at = 0;
+  for (const s of def.scenes) { const n = Math.max(1, Math.round(s.frames)); scenes.push({ name: s.name, from: at, to: at + n - 1, draw: s.draw, inkset: s.inkset, look: s.look }); at += n; }
+  FRAMES = at; const TL = timeline(def.bpm || 96, FPS);
+  FILM = { ...def, scenes, TL, boilEvery: def.boilEvery ?? 0, hold: Math.max(1, def.hold || 1), holdSet: def.hold !== undefined };   // holdSet: a film that names its cadence keeps it; otherwise a look may bring its own
+  stage = document.getElementById('stage'); if (!stage) { stage = document.createElement('canvas'); stage.id = 'stage'; document.body.prepend(stage); }
+  stage.width = OUT_W; stage.height = OUT_H; sctx = stage.getContext('2d', { alpha: false });
+  window.__errors = errors; window.__render = render;
+  window.__film = { title: def.title || document.title, frames: FRAMES, fps: FPS, seed: SEED, bpm: TL.bpm, duration: FRAMES / FPS, size: { FW, FH, w: OUT_W, h: OUT_H, S }, ar: FW === FH ? '1:1' : FW > FH ? `${Math.round(FW / FH * 9)}:9` : `9:${Math.round(FH / FW * 9)}`, scenes: scenes.map(s => ({ name: s.name, from: s.from, to: s.to })), cues: def.cues || [], inks: INKS.slice(), hasScore: !!def.score };
+  window.__frame = i => { render(i); return stage.toDataURL('image/png'); };
+  window.__grid = (n = 24, cell = 240) => gridSheet(n, cell).toDataURL('image/jpeg', .9);
+  window.__sheet = name => sheetCanvas(name).toDataURL('image/png');
+  window.__wav = async stem => encodeWav(await renderOffline(FRAMES / FPS, K => { try { if (def.score) def.score(K, TL); } catch (e) { report('score', e); } }, { solo: stem === 'music' || stem === 'sfx' ? stem : undefined }));   // renderOffline: pre-roll, see the SOUND section
+  const bare = qs.has('bare'); document.body.style.cssText = 'margin:0;background:#262320'; stage.style.cssText = bare ? `display:block;width:${OUT_W}px;height:${OUT_H}px` : 'display:block;max-width:100vw;max-height:88vh;margin:0 auto';
+  try { if (qs.has('grid')) { const img = new Image(); img.src = window.__grid(num(qs.get('grid'), 24)); img.style.maxWidth = '100vw'; stage.hidden = true; stage.after(img); }
+    else if (qs.has('sheet')) { const img = new Image(); img.src = window.__sheet(qs.get('sheet')); img.style.cssText = 'display:block;max-width:100vw;max-height:100vh;margin:0 auto'; stage.hidden = true; stage.after(img); }
+    else { render(num(qs.get('f'), 0)); if (!bare) buildPlayer(def, TL); } } catch (e) { report('boot', e); }
+  window.__ready = true; if (bare) document.title = errors.length ? 'error' : 'ready';
+}
+// A small player for a real browser: play with sound, scrub, see the frame and scene. Not used by the renderer.
+function buildPlayer(def, TL) { const bar = document.createElement('div'); bar.style.cssText = 'display:flex;gap:10px;align-items:center;padding:8px 12px;font:12px ui-monospace,Menlo,monospace;color:#e8e2d6';
+  bar.innerHTML = '<button id="pl">play</button><input id="sc" type="range" min="0" value="0" aria-label="Frame" style="flex:1"><span id="nf"></span>'; stage.after(bar);
+  const pl = bar.querySelector('#pl'), sc = bar.querySelector('#sc'), nf = bar.querySelector('#nf'); sc.max = FRAMES - 1; let playing = false, ac = null, t0 = 0;
+  const show = f => { const name = render(f); sc.value = f; nf.textContent = `f${f}/${FRAMES - 1}  ${(f / FPS).toFixed(2)}s  ${name}`; }; show(window.__f || 0);
+  const tick = () => { if (!playing) return; const t = ac.currentTime - t0, f = Math.floor(t * FPS); if (f >= FRAMES) { playing = false; pl.textContent = 'play'; ac.close(); ac = null; return; } show(f); requestAnimationFrame(tick); };
+  pl.onclick = () => { if (playing) { playing = false; pl.textContent = 'play'; if (ac) { ac.close(); ac = null; } return; } ac = new AudioContext(); t0 = ac.currentTime + .3; if (def.score) { try { def.score(makeKit(ac, t0), TL); } catch (e) { report('score', e); } } playing = true; pl.textContent = 'stop'; tick(); };
+  sc.oninput = () => { if (playing) pl.onclick(); show(+sc.value); }; }
+
+// ---- GUARD (generated by build-core.py) ------------------------------------
+const __CORE_FNS = { applyLook, arcPts, attachEffects, badges, bands, bbox, blob, blot, buildPlayer, centroid, chaikin, defineFilm, dotBurst, drawFrame, encodeWav, fbm, grain, gridSheet, ground, guides, h2, halftoneTile, hexCells, hexLattice, hmix, inkPattern, iris, makeKit, measure, measureKitDelay, mkHand, mul32, muteInks, partial, phraseOf, pip, polyPts, post, proofMarks, render, resample, ribbon, rings, rotPts, scrawl, seedDot, setFormat, sheetCanvas, solidOf, spark, speedLines, stamp, starPts, steam, strHash, streamOf, tornEdge, useInks, useLook, vn, write };
+function __checkCore() { for (const k in __CORE_FNS) if (k !== '__checkCore' && window[k] !== __CORE_FNS[k]) report('name collision', new Error('your film declares a function named "' + k + '", which replaces the engine\'s own ' + k + '(). Rename yours.')); }
+
+</script>
+<script>
+'use strict';
+/* BRIEF
+   subject    a meadow of fireflies at dusk. They start out blinking at random and, by nudging each other, fall into
+              one shared flash. One small firefly is always a moment late. At the very end it lands exactly in time,
+              and a single light in the grass answers it.
+   the idea   the synchrony is not animated by hand: it is the Mirollo-Strogatz pulse-coupled model, run once when
+              the page loads. Every fly has a clock; when it reaches 1 it flashes, resets, and pushes every neighbour's
+              clock forward a little; a push past 1 makes that neighbour flash in the same frame. Groups lock, merge,
+              and the meadow ends in step. The flash timings measured on Photinus carolinus swarms (flash 0.08-0.16 s)
+              set the flash envelope. The SCORE reads the same simulation: every flash is a note, so the random opening
+              sounds like scattered music-box notes and the synced meadow sounds like chords on a heartbeat.
+   length     576 frames, 24 s, 24 fps, 1:1.  BPM 120 (a beat is 12 frames) for the cuts.  look: ghibli.
+   inks       night (deep blue), violet, grass, glow (warm yellow), rose.  anchor: the hero's light.
+   BEAT SHEET
+   shot     frames    s        what happens                                        camera              sound
+   A dusk   0-119     0-5      wide meadow at dusk; lights wake one by one and      slow push in        crickets, pad, scattered
+                               blink at random; the hero wakes on its grass stem                        music-box notes
+   B near   120-215   5-9      close on the hero; small groups around it begin to   close, drifting     notes begin to pair up
+                               flash together; its own blink is always alone
+   C sync   216-359   9-15     wide, deeper night; the meadow locks into one        slow pull back      a chord every second,
+                               flash; the hero's light comes a beat late, alone                          one lonely note after it
+   D join   360-431   15-18    close: it shuts its eyes, tries, and flashes WITH    close               bell and chord together
+                               everyone (TOGETHER, gated); a light below answers                        (gated), an answer chime
+   F flight 432-527   18-22    it lifts off, swoops to the light below; the two     tilt up to the sky  rising arpeggio over
+                               rise together in a spiral, and half the meadow                           the synced chords
+                               rises with them, still flashing as one
+   E card   528-575   22-24    the title writes itself; two small lights blink      static              pad resolves, last bell
+                               together                                                                                    */
+LOOKS.dusk = { ...LOOKS.ghibli, outline: 1.2, dabs: { ...LOOKS.ghibli.dabs, a: .07, angle: 0, len: 24, w: 6 } };
+const FR = 576, SHOTS = { A: [0, 119], B: [120, 215], C: [216, 359], D: [360, 431], F: [432, 527], E: [528, 575] };
+const NIGHTSET = { paper: [244, 240, 226], inks: { night: [26, 32, 76], violet: [96, 74, 150], grass: [44, 108, 80], glow: [255, 208, 80], rose: [236, 140, 128] } };
+const ENV = [1, .93, .75, .55, .36, .2, .1, .04];    // one flash, frame by frame: bright for ~0.12 s as measured, then an afterglow long enough to read
+const HERO_BASE = { x: 270, y: 800 };                 // where the tip of the hero's grass stem rests
+
+// ---- the simulation: run once, read by the picture AND the score -------------------------------------------------
+const SIM = (() => {
+  const R = streamOf('meadow-flies'), N = 100, T = 24, reach = 260, epsMax = .09, flies = [];
+  for (let i = 0; i < N; i++) { let x = rd(R, 30, 1050), y = rd(R, 420, 1000);
+    if (Math.hypot(x - HERO_BASE.x, y - HERO_BASE.y) < 90) x += x < HERO_BASE.x ? -120 : 120;          // leave the hero room
+    flies.push({ i, x, y, T0: T * rd(R, .9, 1.1), ph: R(), wake: Math.floor(R() * R() * 96), fl: [], ph2: rd(R, 0, TAU), voice: i % 3 === 0 }); }
+  for (let f = 0; f < FR; f++) {
+    const eps = f < 110 ? 0 : Math.min(epsMax, (f - 110) / 170 * epsMax), pull = clamp((f - 90) / 200, 0, 1);
+    const awake = flies.filter(q => f >= q.wake), fired = new Set(), queue = [];
+    for (const q of awake) { q.ph += 1 / (q.T0 + (T - q.T0) * pull); if (q.ph >= 1) queue.push(q); }
+    while (queue.length) { const q = queue.shift(); if (fired.has(q)) continue; fired.add(q); q.ph = 0; q.fl.push(f);
+      for (const p of awake) if (!fired.has(p) && Math.hypot(p.x - q.x, p.y - q.y) < reach) { p.ph += eps; if (p.ph >= 1) queue.push(p); } }
+  }
+  const at = Array.from({ length: FR }, () => []); for (const q of flies) for (const f of q.fl) at[f].push(q);
+  const crowd = []; for (let f = 0; f < FR; f++) if (at[f].length >= N * .6) crowd.push(f);
+  // the hero: its own slow clock until the meadow has a rhythm, then always 10 frames behind it (after the crowd's glow has gone, so its light is seen alone), until it joins
+  const JOIN = crowd.find(c => c >= 372), heroFl = [];
+  for (let t = 34; t < crowd[0]; t += 27) heroFl.push(t);
+  for (const c of crowd) { const t = c < JOIN ? c + 10 : c; if (!heroFl.length || t - heroFl[heroFl.length - 1] >= 12) heroFl.push(t); }
+  const answer = crowd.filter(c => c >= JOIN).map(c => c + 18).filter(t => t < FR);
+  const env = list => { const a = new Float32Array(FR); for (const f of list) for (let k = 0; k < ENV.length; k++) if (f + k < FR) a[f + k] = Math.max(a[f + k], ENV[k]); return a; };
+  return { flies, at, crowd, JOIN, ANSWER: answer[0], heroFl, answerFl: answer, B: flies.map(q => env(q.fl)), heroB: env(heroFl), ansB: env(answer) };
+})();
+window.__sim = { crowd: SIM.crowd, JOIN: SIM.JOIN, ANSWER: SIM.ANSWER, hero: SIM.heroFl, perFrame: SIM.at.map(a => a.length) };
+const F_JOIN = SIM.JOIN, F_ANSWER = SIM.ANSWER;
+
+const MOON = (() => { const o = [880, 150, 40], i = [897, 138, 35], out = [], inn = [];
+  for (let k = 0; k < 96; k++) { const a = k / 96 * TAU, p = [o[0] + Math.cos(a) * o[2], o[1] + Math.sin(a) * o[2]]; if (Math.hypot(p[0] - i[0], p[1] - i[1]) > i[2]) out.push([a, p]); }
+  for (let k = 0; k < 96; k++) { const a = k / 96 * TAU, p = [i[0] + Math.cos(a) * i[2], i[1] + Math.sin(a) * i[2]]; if (Math.hypot(p[0] - o[0], p[1] - o[1]) < o[2]) inn.push([a, p]); }
+  const cut = L => { let g = 0; for (let k = 1; k < L.length; k++) if (L[k][0] - L[k - 1][0] > .2) g = k; return L.slice(g).concat(L.slice(0, g)).map(e => e[1]); };
+  return cut(out).concat(cut(inn).reverse()); })();
+// ---- the set -------------------------------------------------------------------------------------------------------
+const hillPts = (y, amp, ph, x0 = -600, x1 = FW + 600) => { const P = [[x0, FH + 120]]; for (let x = x0; x <= x1; x += 24) P.push([x, y + Math.sin(x * .0042 + ph) * amp + Math.cos(x * .011 + ph * 2) * amp * .35]); P.push([x1, FH + 120]); return P; };
+const STARS = (() => { const R = streamOf('stars'), s = []; for (let i = 0; i < 150; i++) s.push([rd(R, -500, FW + 500), rd(R, -520, 400), rd(R, .8, 2.2), rd(R, 0, 1)]); return s; })();
+const BLADES = (() => { const R = streamOf('blades'), b = []; for (let i = 0; i < 300; i++) { const x = rd(R, -60, FW + 60), y = rd(R, 630, FH + 60); b.push({ x, y, h: rd(R, 30, 110) * (y / FH + .2), lean: rd(R, -.3, .3), ph: rd(R, 0, TAU), k: ch(R, .22) ? 'violet' : 'grass', tone: rd(R, .55, 1) }); } return b.sort((a, c) => a.y - c.y); })();
+const CLOVER = (() => { const R = streamOf('clover'), c = []; for (let i = 0; i < 26; i++) c.push([rd(R, 0, FW), rd(R, 700, FH), rd(R, 3, 6)]); return c; })();
+function drawMeadow(H, f) {
+  const dusk = 1 - sstep(0, 380, f);                                  // the rose light goes out over the film
+  H.knock(rect(-600, -560, FW + 600, 560)); H.tint(rect(-600, -560, FW + 600, 560), 'night', 1);
+  H.grad(rect(-600, 200, FW + 600, 560), 'violet', .1, .8 * (.35 + .65 * dusk), [0, 200], [0, 520], 10);
+  H.grad(rect(-600, 330, FW + 600, 560), 'rose', 0, .85 * dusk, [0, 330], [0, 520], 8);
+  for (const [x, y, r, p] of STARS) { const a = sstep(.15, .9, (f / 300) + p * .5 - .2) * (.55 + .45 * Math.sin(f * .07 + p * 40)); if (a > .05) H.dot(x, y, r, 'paper', a, false); }
+  H.fill(MOON, 'paper', .92);                                                                                // a thin moon
+  const wash = (P, k, t) => { H.knock(P); H.tint(P, 'night', 1); H.tint(P, k, t); };
+  wash(hillPts(470, 26, 1.1), 'violet', .75);                                                                // far hills
+  const R = streamOf('treeline'); for (let x = -560; x < FW + 580; x += rd(R, 30, 58)) { const h = rd(R, 60, 150), w = h * rd(R, .22, .3), b = 486; H.fill([[x - w, b], [x - w * .35, b - h * .55], [x - w * .7, b - h * .5], [x, b - h], [x + w * .7, b - h * .5], [x + w * .35, b - h * .55], [x + w, b]], 'night', .92); }
+  wash(hillPts(540, 22, 2.6), 'grass', .6); const MD = hillPts(640, 30, 4.1); H.fill(MD, 'grass', .82);
+  H.grad(MD, 'rose', .22 * dusk + .05, 0, [0, 640], [0, 820], 8); H.grad(MD, 'night', 0, .55, [0, 700], [0, FH], 8);   // lit near the horizon, deep at our feet
+  for (const b of BLADES) { const s = Math.sin(f * .05 + b.ph) * 5 * (b.h / 100); H.line([[b.x, b.y], [b.x + b.lean * b.h * .5 + s * .5, b.y - b.h * .55], [b.x + b.lean * b.h + s, b.y - b.h]], b.k, 3.2 + b.h * .03, { taper: 'out', tone: b.tone }); }
+}
+const nightOver = (H, f) => { const d = .12 + .5 * sstep(60, 330, f); H.tint(rect(-600, -600, FW + 600, FH + 200), 'night', d); };
+
+// ---- the fireflies -------------------------------------------------------------------------------------------------
+// light(x, y, r, b): a halo, a warm core and a white-hot centre, all glows, so nothing gets an outline
+const light = (H, x, y, r, b) => { if (b <= .01) return; H.glow(x, y, r * 4.2, r * 4.2, 'glow', .5 * b, 6, 1.25); H.glow(x, y, r * 1.6, r * 1.6, 'glow', Math.min(1, 1.25 * b), 5, .8); H.glow(x, y, r * .6, r * .6, 'paper', .6 * b, 4, .7); };
+const RISE0 = SHOTS.F[0];   // from here half the meadow takes to the air
+const flyPos = (q, f) => { let x = q.x + Math.sin(f * .021 + q.ph2) * 14, y = q.y + Math.cos(f * .027 + q.ph2 * 1.7) * 9;
+  if (q.i % 2 === 0 && f > RISE0) { const t = Math.max(0, f - RISE0 - (q.i % 17) * 2), sp = 2.4 + (q.i % 7) * .33; y -= t * sp * sstep(0, 20, t); x += Math.sin(t * .06 + q.ph2) * 22 * sstep(0, 30, t); }
+  return [x, y]; };
+function drawFlies(H, f, near) {
+  for (const q of SIM.flies) { if (f < q.wake) continue; const [x, y] = flyPos(q, f), b = SIM.B[q.i][f];
+
+    if (b > .02) { light(H, x - 6, y + 1, near ? 8 : 10, b); if (q.i % 2 === 0 && f > RISE0 + 4) for (const k of [3, 6, 9]) { const [px, py] = flyPos(q, f - k); H.glow(px - 6, py + 1, 9, 9, 'glow', .4 * b * (1 - k / 12), 4, 1); } }
+    else if (near) light(H, x - 6, y + 1, 4, .3); }
+}
+
+// ---- the hero: a naturalist's pencil sketch of Photinus carolinus, seen from the side ----------------------------------
+// Parts are pale WASHES (H.tint: the look adds no outline or shading to a tint) under loose pencil strokes drawn twice,
+// with hatching on the shadow side. Feeling is body language, not a face: antennae droop when it is sad, perk up when
+// it is happy, press forward when it is trying; the wing cases lift and the hind wings show when it is excited.
+// pose: { look: -1..1, mood: -1 sad .. 1 happy, shut: 0..1 (trying hard), sleepy, tilt, hop, glow, wing }
+// where the hero perches: partway along a side BRANCH of the plant (not the top). Everything sways together.
+const heroTip = f => { const a = alongStalk(BRANCH(f), .62); return [a.x, a.y - 5]; };
+// The plant the hero sits on: a sketched stalk with alternate leaves (midrib and veins), fine hairs, a hanging bellflower
+// bud, and dewdrops that catch the firefly's light. Everything hangs off the swaying stalk, so it all sways together.
+const MAIN = f => { const B = HERO_BASE, o = k => Math.sin(f * .045) * 9 * k; return [[B.x - 150, FH + 80], [B.x - 128 + o(.15), B.y + 170], [B.x - 98 + o(.35), B.y + 40], [B.x - 102 + o(.6), B.y - 110], [B.x - 86 + o(.8), B.y - 230], [B.x - 70 + o(1), B.y - 330]]; };
+const BRANCH = f => { const m = MAIN(f), a = m[2], B = HERO_BASE, sw = Math.sin(f * .045 + .6) * 4; return [[a[0], a[1]], [a[0] + 44, a[1] - 30 + sw * .3], [B.x - 8 + sw * .6, B.y + 3 + sw * .5], [B.x + 40 + sw, B.y + 6 + sw * .8], [B.x + 88 + sw, B.y + 18 + sw]]; };
+const BRANCH2 = f => { const p0 = alongStalk(MAIN(f), .64), sw = Math.sin(f * .045 + 1.4) * 5; return [[p0.x, p0.y], [p0.x - 40, p0.y - 40 + sw * .4], [p0.x - 84 + sw, p0.y - 52 + sw * .7], [p0.x - 112 + sw, p0.y - 44 + sw]]; };   // a second branch, up and to the left
+const stalk = MAIN;
+const alongStalk = (st, t) => { const L = [0]; for (let i = 1; i < st.length; i++) L.push(L[i - 1] + Math.hypot(st[i][0] - st[i - 1][0], st[i][1] - st[i - 1][1])); const d = t * L[L.length - 1]; let i = 1; while (i < st.length - 1 && L[i] < d) i++;
+  const u = (d - L[i - 1]) / (L[i] - L[i - 1] || 1), x = lerp(st[i - 1][0], st[i][0], u), y = lerp(st[i - 1][1], st[i][1], u); return { x, y, ang: Math.atan2(st[i][1] - st[i - 1][1], st[i][0] - st[i - 1][0]) }; };
+function leafShape(x, y, ang, len, wid, bend) { const mid = [], up = [], lo = []; for (let i = 0; i <= 14; i++) { const t = i / 14, a = ang + bend * t, px = x + Math.cos(ang) * len * t + Math.cos(a + Math.PI / 2) * bend * len * .18 * t * t, py = y + Math.sin(ang) * len * t + Math.sin(a + Math.PI / 2) * bend * len * .18 * t * t, hw = wid * Math.sin(Math.PI * Math.pow(t, .8)) * (1 - .15 * t);
+  mid.push([px, py]); up.push([px + Math.cos(a - Math.PI / 2) * hw, py + Math.sin(a - Math.PI / 2) * hw]); lo.push([px + Math.cos(a + Math.PI / 2) * hw, py + Math.sin(a + Math.PI / 2) * hw]); } return { mid, outline: up.concat(lo.reverse()) }; }
+const LEAVES = [[.1, -1, 150, 23, -.5], [.24, 1, 116, 19, .45], [.5, -1, 120, 19, -.4], [.8, -1, 96, 16, -.35], [.9, 1, 80, 13, .35]];
+const LEAFLETS = [[.06, 1, 42, 8, .35], [.18, -1, 38, 7.5, -.3], [.36, -1, 34, 7, -.3], [.6, 1, 30, 6, .3], [.7, -1, 28, 6, -.25], [.86, -1, 24, 5, -.2], [.96, 1, 20, 4.5, .3]];   // small leaves up the stalk
+const BLOSSOMS = [[.16, -1, 44, 'rose', 8.5], [.3, -1, 40, 'paper', 7.5], [.44, -1, 36, 'violet', 7], [.66, 1, 34, 'rose', 7], [.76, 1, 30, 'paper', 6.5], [.94, -1, 28, 'violet', 6]];                               // where, side, stem length, colour, size   // where on the stalk (0 = ground, 1 = tip), side, length, width, curl
+function drawStem(H, f) {
+  const st = stalk(f), g = SIM.heroB[f] || 0;
+  H.line(st, 'rose', 40, { taper: 'out', tone: .85 }); H.line(st, 'night', 40, { taper: 'out', tone: .55 }); H.line(st.slice(0, 3), 'rose', 58, { taper: 'out', tone: .85 }); H.line(st.slice(0, 3), 'night', 58, { taper: 'out', tone: .55 }); H.line(st.map(q => [q[0] + 9, q[1]]), 'night', 12, { taper: 'out', tone: .35 });   // brown: rose under night
+  for (const [dx, k] of [[-6, 0], [2, 1], [8, 2]]) pencil(H, st.slice(0, 4).map(q => [q[0] + dx, q[1]]), .7, .35, false, 'bark' + k);   // bark   // the stalk, with a shadow side
+  const br = BRANCH(f); H.line(br, 'rose', 14, { taper: 'out', tone: .8 }); H.line(br, 'night', 14, { taper: 'out', tone: .5 }); H.line(br.map(q => [q[0], q[1] + 2]), 'night', 2.4, { taper: 'out', tone: .25 }); pencil(H, br, .95, .55, false, 'branch');
+  const b2 = BRANCH2(f); H.line(b2, 'rose', 12, { taper: 'out', tone: .8 }); H.line(b2, 'night', 12, { taper: 'out', tone: .5 }); H.line(b2.map(q => [q[0], q[1] + 2]), 'night', 2.4, { taper: 'out', tone: .25 }); pencil(H, b2, .9, .5, false, 'branch2');
+  [[.35, 1, 50, 9, .3], [.6, -1, 46, 8, -.3], [1, 1, 40, 7, .25]].forEach(([t, side, len, wid, curl], k) => { const a = alongStalk(b2, Math.min(t, .99)), lf = leafShape(a.x, a.y, a.ang + side * .8 + Math.sin(f * .05 + k) * .05, len, wid, curl);
+    H.tint(lf.outline, 'night', 1); H.tint(lf.outline, 'grass', .8); pencil(H, lf.outline, .8, .65, true, 'b2leaf' + k); pencil(H, lf.mid, .6, .45, false, 'b2rib' + k); });
+  { const a = alongStalk(b2, .8), fx = a.x - 6, fy = a.y - 34, r = 7; H.line([[a.x, a.y], [a.x - 2, a.y - 16], [fx, fy]], 'grass', 2.8, { amp: .2, tone: 1 });
+    for (let i = 0; i < 5; i++) { const pa = i * 1.2566; H.tint(ell(fx + Math.cos(pa) * r * .9, fy + Math.sin(pa) * r * .9, r * .62, r * .62, 12), 'violet', .85); } H.tint(circ(fx, fy, r * .38, 10), 'glow', 1); }
+  { const e = br[br.length - 1], lf = leafShape(e[0], e[1], .35 + Math.sin(f * .05) * .05, 26, 5.5, .3); H.tint(lf.outline, 'night', 1); H.tint(lf.outline, 'grass', .8); pencil(H, lf.outline, .75, .65, true, 'branchleaf'); }
+  { const a = alongStalk(br, .3), fx = a.x + 4, fy = a.y + 26, r = 4.6; H.line([[a.x, a.y], [a.x + 6, a.y + 12], [fx, fy]], 'grass', 2.8, { amp: .2, tone: 1 });
+    for (let i = 0; i < 5; i++) { const pa = i * 1.2566 + 1.3; H.tint(ell(fx + Math.cos(pa) * r * .9, fy + Math.sin(pa) * r * .9, r * .6, r * .6, 10), 'rose', .85); } H.tint(circ(fx, fy, r * .38, 10), 'glow', 1); }
+  pencil(H, st.slice(1), 1.1, .5, false, 'stalk');
+  for (let i = 0; i < 18; i++) { const a = alongStalk(st, .15 + i * .045), n = a.ang - Math.PI / 2 * (i % 2 ? 1 : -1); H.line([[a.x, a.y], [a.x + Math.cos(n - .5) * 5, a.y + Math.sin(n - .5) * 5]], 'paper', .6, { amp: .1, tone: .4 }); }   // fine hairs
+  LEAVES.forEach(([t, side, len, wid, curl], k) => { const a = alongStalk(st, t), ang = a.ang + side * 1.05 + Math.sin(f * .04 + k) * .04, lf = leafShape(a.x, a.y, ang, len, wid, curl);
+    H.tint(lf.outline, 'night', 1); H.tint(lf.outline, 'grass', .72); H.hatch(lf.outline.slice(0, 15).concat([lf.mid[14]]), 'paper', 3, ang - .6, .55, { tone: .3, skip: .3 });                                             // leaf, lit a little on its upper half
+    H.hatch(lf.outline.slice(15).concat([lf.mid[0]]), 'night', 3.2, ang + .7, .6, { tone: .35, skip: .2 });                    // shade on the underside
+    pencil(H, lf.outline, 1, .7, true, 'leaf' + k); pencil(H, lf.mid, .8, .55, false, 'rib' + k);
+    for (let j = 3; j < 13; j += 3) { const m = lf.mid[j], o = lf.outline[j]; H.line([m, [lerp(m[0], o[0], .8) + Math.cos(ang) * 6, lerp(m[1], o[1], .8) + Math.sin(ang) * 6]], 'paper', .55, { amp: .2, tone: .35 }); }   // veins
+    const dew = lf.mid[9], r = 2.6 + k * .4; H.tint(circ(dew[0], dew[1] - 2, r, 14), 'paper', .35); H.line(circ(dew[0], dew[1] - 2, r, 14), 'paper', .6, { closed: true, amp: .1, tone: .7 });   // a dewdrop
+    H.dot(dew[0] - r * .35, dew[1] - 2 - r * .35, r * .3, 'paper', .95, false); if (g > .05) light(H, dew[0], dew[1] - 2, 2.2, g * .4); });
+  LEAFLETS.forEach(([t, side, len, wid, curl], k) => { const a = alongStalk(st, t), ang = a.ang + side * .9 + Math.sin(f * .05 + k * 1.7) * .06, lf = leafShape(a.x, a.y, ang, len, wid, curl);
+    H.tint(lf.outline, 'night', 1); H.tint(lf.outline, 'grass', .8); pencil(H, lf.outline, .75, .65, true, 'leaflet' + k); H.line(lf.mid.slice(0, 11), 'paper', .45, { amp: .1, tone: .35 }); });
+  // small five-petal blossoms on short side stems; their centres catch the firefly's light
+  BLOSSOMS.forEach(([t, side, len, ink, r], k) => { const a = alongStalk(st, t), ang = a.ang + side * .75 + Math.sin(f * .045 + k * 2.3) * .08, fx = a.x + Math.cos(ang) * len, fy = a.y + Math.sin(ang) * len;
+    H.line([[a.x, a.y], [lerp(a.x, fx, .5) + Math.cos(ang - side * .5) * 4, lerp(a.y, fy, .5) + Math.sin(ang - side * .5) * 4], [fx, fy]], 'grass', 2.8, { amp: .2, tone: 1 });
+    for (let i = 0; i < 5; i++) { const pa = i * 1.2566 + k, pet = ell(fx + Math.cos(pa) * r * .9, fy + Math.sin(pa) * r * .9, r * .75, r * .52, 12).map(q => { const dx = q[0] - (fx + Math.cos(pa) * r * .9), dy = q[1] - (fy + Math.sin(pa) * r * .9); return [fx + Math.cos(pa) * r * .9 + dx * Math.cos(pa) - dy * Math.sin(pa), fy + Math.sin(pa) * r * .9 + dx * Math.sin(pa) + dy * Math.cos(pa)]; });
+      H.tint(pet, 'night', 1); H.tint(pet, ink, ink === 'paper' ? .75 : .85); H.line(pet, 'paper', .5, { closed: true, amp: .3, tone: .55 }); }
+    H.tint(circ(fx, fy, r * .38, 10), 'glow', .8); if (g > .05) light(H, fx, fy, 1.8, g * .3); });
+  // a third branch, up and to the right, and a leafy crown at the top: this is what makes it read as a tree
+  const b3 = (() => { const p0 = alongStalk(st, .84), sw = Math.sin(f * .045 + 2.1) * 5; return [[p0.x, p0.y], [p0.x + 36, p0.y - 30 + sw * .4], [p0.x + 74 + sw, p0.y - 36 + sw * .7], [p0.x + 100 + sw, p0.y - 30 + sw]]; })();
+  H.line(b3, 'rose', 11, { taper: 'out', tone: .8 }); H.line(b3, 'night', 11, { taper: 'out', tone: .5 }); pencil(H, b3, .85, .5, false, 'branch3');
+  const top = st[st.length - 1], cc = [top[0] + 10, top[1] - 46], crown = [];
+  for (const [dx, dy, rx, ry, k] of [[0, 0, 88, 62, 0], [-48, 22, 50, 40, 1], [52, 18, 54, 42, 2], [0, -32, 62, 42, 3]]) { const m = blob(streamOf('canopy', k), cc[0] + dx, cc[1] + dy, rx, ry); H.tint(m, 'night', 1); H.tint(m, 'grass', .55); }   // canopy mass
+  for (let k = 0; k < 64; k++) { const R2 = streamOf('crownleaf', k), a = rd(R2, 0, TAU), rr = Math.sqrt(R2()), bx = cc[0] + Math.cos(a) * 118 * rr, by = cc[1] + Math.sin(a) * 84 * rr, out = Math.atan2(by - cc[1], bx - cc[0]) + rd(R2, -.5, .5);
+    crown.push({ a: out, base: [bx - Math.cos(out) * 14, by - Math.sin(out) * 14], len: rd(R2, 34, 54), wid: rd(R2, 12, 17), curl: rd(R2, -.3, .3), tone: rd(R2, .62, .98), k }); }
+  for (const e of b3.slice(2).concat(b2.slice(2))) for (let k = 0; k < 5; k++) { const R2 = streamOf('twig', k, Math.round(e[0])), a = rd(R2, -Math.PI, 0); crown.push({ a, base: [e[0], e[1]], len: rd(R2, 30, 46), wid: rd(R2, 10, 14), curl: rd(R2, -.3, .3), tone: rd(R2, .65, .95), k: 100 + k + Math.round(e[0]) }); }
+  crown.sort((c1, c2) => c1.base[1] - c2.base[1] || c1.k - c2.k);
+  for (const c of crown) { const lf = leafShape(c.base[0], c.base[1], c.a + Math.sin(f * .04 + c.k) * .04, c.len, c.wid, c.curl); H.tint(lf.outline, 'night', 1); H.tint(lf.outline, 'grass', c.tone); H.tint(lf.outline.slice(0, 15), 'glow', .1);
+    pencil(H, lf.outline, .8, .6, true, 'cr' + c.k); }
+  for (let k = 0; k < 9; k++) { const R2 = streamOf('crownflower', k), a = rd(R2, 0, TAU), d = Math.sqrt(R2()) * 100, fx = cc[0] + Math.cos(a) * d, fy = cc[1] + Math.sin(a) * d * .7, r = rd(R2, 6, 8.5), ink = pk(R2, ['rose', 'paper', 'violet']);
+    for (let i = 0; i < 5; i++) { const pa = i * 1.2566 + k; H.tint(ell(fx + Math.cos(pa) * r * .9, fy + Math.sin(pa) * r * .9, r * .62, r * .62, 12), ink, .85); } H.tint(circ(fx, fy, r * .38, 10), 'glow', .8); }
+  // a bellflower bud hanging on a short stalk beside the hero
+  const b0 = b2[b2.length - 1], bx = b0[0] - 10, by = b0[1] + 50 + Math.sin(f * .05) * 1.5, bs = 1.6;
+  const ped = chaikin([[b0[0], b0[1]], [b0[0] - 16, b0[1] + 6], [bx - 4, by - 30], [bx, by - 10]], false, 3); H.line(ped, 'grass', 2.4, { amp: .2, tone: .9 }); pencil(H, ped, .9, .7, false, 'pedicel');
+  const bell = [[-8, -4], [-7, 6], [-9, 12], [-4, 10], [0, 13], [4, 10], [9, 12], [7, 6], [8, -4], [0, -7]].map(([u, v]) => [bx + u * bs, by + v * bs]);
+  H.tint(bell, 'violet', .6); H.tint(bell.slice(0, 4).concat([[bx, by]]), 'paper', .15); pencil(H, bell, .9, .75, true, 'bell'); H.line([[bx, by - 5], [bx, by + 11]], 'paper', .5, { amp: .2, tone: .4 });
+  if (g > .05) light(H, bx, by + 4, 3, g * .5);
+}
+// pencil(): how a hand actually draws a contour. The line is broken into pieces of uneven length that overlap and
+// overshoot at their ends, each tapered so its weight varies, then gone over a second time a little off and lighter.
+// It is seeded by the PART (key), not the frame, so the strokes belong to the drawing and move with it instead of
+// crawling. The ink is pale: this is white pencil on a dark night, where more marks means lighter.
+function pencil(H, pts, w, tone, closed, key, ink = 'paper') {
+  const R = streamOf('pencil', key), rs = resample(closed ? pts.concat([pts[0]]) : pts, 2.2), n = rs.length; if (n < 3) return;
+  for (const pass of [0, 1]) { let i = 0; const dx = pass ? rd(R, -.9, .9) : 0, dy = pass ? rd(R, -.9, .9) : 0;
+    while (i < n - 1) { const j = Math.min(n - 1, i + Math.max(4, Math.round(n * rd(R, .22, .5)))), seg = rs.slice(Math.max(0, i - 1), j + 1).map(q => [q[0] + dx, q[1] + dy]);
+      const a = seg[seg.length - 2], b = seg[seg.length - 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, over = rd(R, .5, 2.4); seg.push([b[0] + (b[0] - a[0]) / L * over, b[1] + (b[1] - a[1]) / L * over]);
+      H.line(seg, ink, w * rd(R, .7, 1.2) * (pass ? .6 : 1), { amp: 1.8, tone: tone * (pass ? rd(R, .35, .55) : rd(R, .75, 1)), taper: 'both' });
+      i = j - ri(R, 0, 1); if (ch(R, .25)) i += 1; } }
+}
+function drawHero(H, f, p) {
+  const [tx, ty] = p.at || heroTip(f), s = 1.35 * (p.scale || 1), mood = p.mood || 0, shut = p.shut || 0, sleepy = p.sleepy || 0, hop = p.hop || 0;
+  const cx = tx, cy = ty - 17 - hop, a = (p.tilt || 0) + .62 * Math.max(0, -mood) + .06 * shut, ca = Math.cos(a), sa = Math.sin(a), sq = 1 - .07 * shut;
+  const P = (u, v) => { u *= sq; return [cx + (u * ca - v * sa) * s, cy + (u * sa + v * ca) * s]; }, L = pts => pts.map(q => P(q[0], q[1]));
+  const toLocal = (X, Y) => { const dx = X - cx, dy = Y - cy; return [(dx * ca + dy * sa) / s / sq, (-dx * sa + dy * ca) / s]; };
+  const E = (u, v, rx, ry, n = 26, rot = 0, a0 = 0, a1 = TAU) => { const o = []; for (let i = 0; i < n; i++) { const t = a0 + (a1 - a0) * i / (a1 - a0 < TAU ? n - 1 : n), x = Math.cos(t) * rx, y = Math.sin(t) * ry; o.push(P(u + x * Math.cos(rot) - y * Math.sin(rot), v + x * Math.sin(rot) + y * Math.cos(rot))); } return o; };
+  const g = p.glow || 0, w = clamp(p.wing || 0, 0, 1), warm = k => { H.tint(k, 'night', 1); H.tint(k, 'paper', .26); H.tint(k, 'rose', .12); };   // opaque: a dark underpaint, then the warm washes
+  // antennae: the clearest signal of feeling. up and apart when happy, hanging when sad, pressed flat forward when trying
+  const ant = mood > 0 ? -1.05 - .45 * mood : mood < 0 ? -1.05 + 1.9 * -mood : -1.05; const antA = lerp(ant, -.14, shut) + .8 * sleepy + (p.look || 0) * .1;
+  for (const [k, off] of [[0, 0], [1, mood > .3 ? .32 : .14]]) { const pts = []; for (let i = 0; i <= 12; i++) { const r = i * 4.3, b = antA + off + i * (mood < 0 ? .07 : .035); pts.push([33 + Math.cos(b) * r, -7 + Math.sin(b) * r]); }
+    pencil(H, L(pts), 1.25, k ? .6 : .95, false, 'ant' + k); for (let i = 3; i <= 12; i += 3) { const q = P(pts[i][0], pts[i][1]); H.dot(q[0], q[1], .9 * s, 'paper', .7, false); } }
+  // hind wings: a beetle flies by opening the wing cases and BEATING the hind wings underneath. They beat about 8 times a
+  // second, and the two previous beat positions are drawn faintly as a motion smear, the way a drawn flap reads
+  const HINGE = [8, -8], hindAt = ph => (232 + 44 * Math.sin(ph)) * Math.PI / 180, wingPts = (ang, len, k) => { const o = []; for (let i = 0; i < 22; i++) { const t = i / 22 * TAU, x = (Math.cos(t) + 1) * len * .5, y = Math.sin(t) * 6.5 * (1 - .3 * Math.cos(t)); o.push(P(HINGE[0] - 4 + x * Math.cos(ang) - y * Math.sin(ang), HINGE[1] - 1 + x * Math.sin(ang) + y * Math.cos(ang))); } return o; };   // ang: the direction the wing points, from its root
+  if (w > .05) for (const [lag, al] of [[1, .22], [0, .8]]) { const ph = (f - lag) * 1.5708; for (const [off, len, k] of [[0, 40, 'hw0'], [.35, 35, 'hw1']]) { const m = wingPts(hindAt(ph + off + (p.wphase || 0)), len, k);
+    H.opacity(al * w, () => { H.tint(m, 'paper', .22); if (!lag) pencil(H, m, .8, .7, true, k + (Math.floor(f / 2) % 2)); else H.line(m, 'paper', .7, { closed: true, amp: .4, tone: .6 }); }); } }
+  // belly and lantern: the lantern is two narrow bands wrapped round the tail
+  const belly = E(-16, 6, 17, 7, 26, .06); warm(belly); for (let i = 0; i < 4; i++) pencil(H, L([[-6 - i * 5, 1], [-7 - i * 5, 12]]), .7, .45, false, 'seg' + i);
+  const tail = []; for (let i = 0; i < 40; i++) { const t = i / 40 * TAU, u = -16 + Math.cos(t) * 17, v = 6 + Math.sin(t) * 7; if (u < -24) tail.push(P(u * Math.cos(.06) - (v - 6) * Math.sin(.06), 6 + u * 0 + (v - 6) * Math.cos(.06) + (u + 16) * Math.sin(.06))); }
+  const tailS = tail.sort((q1, q2) => Math.atan2(q1[1] - P(-33, 6)[1], q1[0] - P(-33, 6)[0]) - Math.atan2(q2[1] - P(-33, 6)[1], q2[0] - P(-33, 6)[0]));
+  H.tint(tailS, 'glow', 1); if (g < .25) { const [qx, qy] = P(-30, 7); light(H, qx, qy, 7, .28); } pencil(H, belly, 1.05, .8, true, 'belly'); pencil(H, L([[-24, 0], [-25, 12.5]]), .8, .7, false, 'lanternseg'); pencil(H, L([[-29.5, 1], [-30.5, 12]]), .7, .55, false, 'lanternseg2');
+  if (g > .02) { const [lx, ly] = P(-29, 7); light(H, lx, ly, p.wide ? 22 : 13, g); }
+  // legs: jointed, the feet pinned ON the stalk wherever the body has tilted; they let go and dangle when it hops
+  const stemPt = t => { const a = alongStalk(BRANCH(f), lerp(.72, .5, t)); return [a.x, a.y - 3]; };   // feet on the branch under the body, front to back
+  [[10, 0], [2, .45], [-6, .9]].forEach(([x0, t], k) => { const grip = toLocal(...stemPt(t)), air = p.fly ? 1 : sstep(2, 6, hop), foot = [lerp(grip[0], x0 - 3 + k, air), lerp(grip[1], 15, air)], knee = [(x0 + foot[0]) / 2 + 5 - k * 3, (5 + foot[1]) / 2 - 3];
+    pencil(H, L([[x0, 5], knee, foot]), 1.15, .85, false, 'leg' + k); pencil(H, L([foot, [foot[0] + 3, foot[1] + 1.5]]), .8, .7, false, 'claw' + k); });
+  // wing cases: a warm grey-brown wash, light hatching on the lit upper half, and the pale margin of this species
+  const lift = .62 * w, EH = (u, v, rx, ry, n, a0, a1) => { const o = []; for (let i = 0; i < n; i++) { const t = a0 === undefined ? i / n * TAU : a0 + (a1 - a0) * i / (n - 1), x = u + Math.cos(t) * rx * Math.cos(.06) - Math.sin(t) * ry * Math.sin(.06), y = v + Math.cos(t) * rx * Math.sin(.06) + Math.sin(t) * ry * Math.cos(.06);
+      const dx = x - HINGE[0], dy = y - HINGE[1]; o.push(P(HINGE[0] + dx * Math.cos(lift) - dy * Math.sin(lift), HINGE[1] + dx * Math.sin(lift) + dy * Math.cos(lift))); } return o; };   // rotated about the front hinge
+  const el = EH(-6, -3, 26, 9.5, 30);
+  warm(el); H.hatch(EH(-6, -3, 26, 9.5, 18, Math.PI, TAU), 'paper', 3.2, .9, .6, { tone: .45, skip: .25 });
+  pencil(H, EH(-6, -3, 24.5, 8.2, 18, .15, Math.PI - .15), 1, .75, false, 'margin', 'glow'); pencil(H, el, 1.3, .95, true, 'elytra');
+  // the pronotum, a plain pale rose shield, behind the head
+  const shield = E(14, -6.5, 12.5, 8.2, 28, -.2); H.tint(shield, 'rose', .45); H.hatch(E(14, -6.5, 12.5, 8.2, 16, -.2, Math.PI + .2, TAU - .2), 'paper', 2.8, .55, .5, { tone: .4, skip: .3 });
+  pencil(H, shield, 1.2, .95, true, 'shield');
+  // the face: a big round head (cute proportions), a big dark eye whose lid tells the feeling, a small mouth, a blush
+  const hx = 29, hy = .5, head = E(hx, hy, 10, 9.6, 26); warm(head); H.tint(E(hx + 1, hy + 4, 3.4, 2, 14), 'rose', .45); pencil(H, head, 1.1, .95, true, 'head');
+  const ex = hx + 3, ey = hy - 2, er = 4.9, lid = clamp(Math.max(shut, sleepy * .55, Math.max(0, -mood) * .52), 0, 1), look = (p.look || 0) * 1.4;
+  if (lid > .85) pencil(H, L([[ex - er, ey + .5], [ex - er * .4, ey + 2.2], [ex + er * .4, ey + 2.2], [ex + er, ey + .5]]), 1.2, 1, false, 'lidshut');
+  else { H.tint(E(ex, ey, er, er * 1.08, 20), 'night', 1); for (const [du, dv, r] of [[-1.5, -1.7, 1.25], [1.2, 1.3, .6]]) { const q = P(ex + du + look, ey + dv); H.dot(q[0], q[1], r * s, 'paper', .95, false); }
+    pencil(H, E(ex, ey, er, er * 1.08, 20), .8, .7, true, 'eye');
+    if (lid > .05) { const cut = ey - er * 1.08 + 2 * er * 1.08 * lid, top = E(ex, ey, er + .4, er * 1.08 + .4, 20, 0, Math.PI, TAU).filter(q => toLocal(...q)[1] < cut), tilt = Math.max(0, -mood) * 1.6;
+      if (top.length > 2) { const lidPts = top.concat([P(ex + er + .4, cut + tilt), P(ex - er - .4, cut - tilt)]); H.tint(lidPts, 'paper', .5); H.tint(lidPts, 'rose', .2); pencil(H, L([[ex - er - .6, cut - tilt], [ex + er + .6, cut + tilt]]), 1, .95, false, 'lid'); } } }
+  pencil(H, L([[hx + 4.4, hy + 5.4], [hx + 7.2, hy + 5.8 + mood * 2.8], [hx + 10, hy + 5.1]]), .95, .9, false, 'mouth');
+}
+// the pose follows the story and the flashes
+function heroPose(f) {
+  const g = SIM.heroB[f], look0 = Math.sin(f * .06) * .7, wake = sstep(20, 44, f), stretch = sstep(46, 50, f) * (1 - sstep(64, 70, f));   // a waking flutter
+  if (f < SHOTS.B[0]) return { sleepy: 1 - wake, look: look0 * wake, mood: .3 * wake, glow: g, wing: stretch };
+  if (f < SHOTS.C[0]) { let best = 0, dir = 0; const [hx, hy] = heroTip(f); for (const q of SIM.flies) { const b = SIM.B[q.i][f]; if (b > best && Math.hypot(q.x - hx, q.y - hy) < 280) { best = b; dir = Math.sign(q.x - hx); } }
+    const since = f - (SIM.heroFl.filter(t => t <= f).pop() ?? -99), sad = since >= 0 && since < 40 ? bump(0, 40, since) : 0;
+    return { look: best > .3 ? dir : look0 * .5, mood: .2 - .9 * sad, glow: g }; }
+  if (f < SHOTS.D[0]) return { look: look0, mood: -.5, glow: g };
+  if (f < F_JOIN) return { shut: 1, mood: 0, glow: g, tilt: Math.sin(f * 1.9) * .025 };
+  const j = f - F_JOIN, lookDown = f >= F_ANSWER ? sstep(F_ANSWER, F_ANSWER + 8, f) : 0, flap = sstep(0, 3, j) * (1 - sstep(24, 30, j));
+  return { look: .3 + lookDown * .9, mood: 1, glow: Math.max(g, .8 * flap), wing: flap, hop: flap * 11 * Math.abs(Math.sin(j * .45)), tilt: .06 * lookDown };
+}
+const ANS_POS = [HERO_BASE.x + 125, HERO_BASE.y + 95];
+// the flight: the hero leaves its stalk, swoops down to the one who answered, and the two rise in a double spiral
+const bez = (a, b, c, t) => [(1 - t) * (1 - t) * a[0] + 2 * (1 - t) * t * b[0] + t * t * c[0], (1 - t) * (1 - t) * a[1] + 2 * (1 - t) * t * b[1] + t * t * c[1]];
+function pairAt(f) { const t0 = SHOTS.F[0], meet = t0 + 20, t1 = SHOTS.F[1], [tx, ty] = heroTip(t0), start = [tx, ty - 17], M = [ANS_POS[0] + 60, ANS_POS[1] - 110];
+  if (f < meet) { const u = easeOut((f - t0) / (meet - t0)); return { h: bez(start, [tx + 90, ty - 70], [M[0] + 80, M[1]], u), fem: bez(ANS_POS, [ANS_POS[0] + 10, ANS_POS[1] - 50], [M[0] - 80, M[1]], sstep(t0 + 3, meet, f)) }; }
+  const u = (f - meet) / (t1 - meet), c = bez(M, [M[0] + 110, M[1] - 250], [720, 210], sstep(0, 1, u) * .8 + u * .2), ph = (f - meet) * .13, r = 80;
+  return { h: [c[0] + Math.cos(ph) * r, c[1] + Math.sin(ph) * r * .95], fem: [c[0] - Math.cos(ph) * r, c[1] - Math.sin(ph) * r * .95], z: Math.sin(ph), c }; }
+const ESCORTS = (() => { const R = streamOf('escorts'), e = []; for (let i = 0; i < 32; i++) e.push({ a: rd(R, 0, TAU), rad: rd(R, 90, 260), sp: rd(R, .015, .04) * (ch(R, .5) ? 1 : -1), late: rd(R, 0, 16), vy: rd(R, -30, 60) }); return e; })();
+function drawEscorts(H, f) { const t0 = SHOTS.F[0], b = Math.max(SIM.heroB[f], .3);
+  for (const e of ESCORTS) { const at = k => { const g = f - k, pr = pairAt(Math.max(t0, g)), c = [(pr.h[0] + pr.fem[0]) / 2, (pr.h[1] + pr.fem[1]) / 2], lift = sstep(t0 + e.late, t0 + e.late + 18, g), an = e.a + g * e.sp;
+      return [lerp(ANS_POS[0] + Math.cos(e.a) * e.rad, c[0] + Math.cos(an) * e.rad, lift), lerp(ANS_POS[1] + 60, c[1] + Math.sin(an) * e.rad * .45 + e.vy, lift)]; };
+    if (f < t0 + e.late) continue; const [x, y] = at(0); light(H, x, y, 7, b); for (const k of [2, 4, 6, 8]) { const [px, py] = at(k); H.glow(px, py, 7, 7, 'glow', .5 * (1 - k / 10), 4, 1); } } }
+function shotFlight(H, R, u, f) {
+  const pr = pairAt(f), c = [(pr.h[0] + pr.fem[0]) / 2, (pr.h[1] + pr.fem[1]) / 2];
+  H.view({ x: lerp(440, c[0] + 150 * sstep(0, .5, u), sstep(0, .25, u)), y: lerp(720, c[1] + 70, sstep(0, .35, u)), zoom: lerp(2.3, 1.3, sstep(0, 1, u)) }, () => {
+    drawMeadow(H, f); nightOver(H, f); drawFlies(H, f, false); drawStem(H, f);
+    drawEscorts(H, f);
+    const z = pr.z || 0, fem = { at: pr.fem, scale: .72 * (1 - .25 * z), fly: true, wing: 1, wphase: 1.3, mood: 1, look: .4, glow: Math.max(SIM.heroB[f], .35), tilt: -.8 + .18 * Math.sin(f * .17 + 2) },
+      hero = { at: pr.h, scale: 1 + .25 * z, fly: true, wing: 1, mood: 1, look: .3, glow: Math.max(SIM.heroB[f], .45), tilt: -1 + .18 * Math.sin(f * .21) };
+    if (z > 0) { drawHero(H, f, fem); drawHero(H, f, hero); } else { drawHero(H, f, hero); drawHero(H, f, fem); }   // whoever is nearer is drawn last
+  }); }
+function drawAnswer(H, f) { const b = SIM.ansB[f]; H.fill(ell(ANS_POS[0] - 4, ANS_POS[1], 7, 4.5, 12), 'night', 1);
+  light(H, ANS_POS[0] - 6, ANS_POS[1] + 1, 9, Math.max(.3, b)); }
+
+// ---- shots ---------------------------------------------------------------------------------------------------------
+function world(H, f, near) { drawMeadow(H, f); nightOver(H, f); drawFlies(H, f, near); drawStem(H, f); if (f >= F_JOIN) drawAnswer(H, f); drawHero(H, f, { ...heroPose(f), wide: !near }); }
+const shot = (zoom0, zoom1, fx, fy, near) => (H, R, u, f) => { const [tx, ty] = heroTip(f); H.view({ x: lerp(fx === 'hero' ? tx + 22 : fx, fx === 'hero' ? tx + 8 : fx, u), y: fy === 'hero' ? ty - 40 : fy, zoom: lerp(zoom0, zoom1, easeOut(u)) }, () => world(H, f, near)); };
+const shotAnswer = (H, R, u, f) => { const [tx, ty] = heroTip(f), k = sstep(F_JOIN + 8, F_ANSWER + 6, f); H.view({ x: tx + 10 + k * 55, y: ty - 40 + k * 70, zoom: 4.3 - k * 1.5 }, () => world(H, f, true)); };
+function endCard(H, R, u, f, lf) {
+  H.knock(rect(-20, -20, FW + 20, FH + 20)); H.tint(rect(-20, -20, FW + 20, FH + 20), 'night', 1); for (const [x, y, r, p] of STARS) H.dot(x, y + 200, r, 'paper', .5 + .3 * Math.sin(p * 30 + f * .05), false);
+  const b = SIM.heroB[f], a = SIM.ansB[f];
+  for (const [x, y, v] of [[CX - 34, CY + 170, b], [CX + 34, CY + 196, Math.max(a, b * .6)]]) light(H, x, y, 14, Math.max(.45, v));
+  write(H, streamOf('title'), 'out of step', CX, CY - 60, 92, { center: true, n: Math.floor(lf * .75), ink: 'glow', w: 5 });
+  write(H, streamOf('sub'), 'fireflies teach each other to flash together', CX, CY + 44, 34, { center: true, n: Math.max(0, Math.floor((lf - 12) * 2.6)), ink: 'paper', w: 2.6, tone: 1 });
+}
+defineFilm({
+  title: 'out of step', inkset: NIGHTSET, look: 'dusk', bpm: 120, fps: 24,
+  scenes: [
+    { name: 'dusk', frames: 120, draw: shot(1, 1.1, 560, 600, false) },
+    { name: 'near', frames: 96, draw: shot(3.9, 4.3, 'hero', 'hero', true) },
+    { name: 'sync', frames: 144, draw: shot(1.12, 1.0, 540, 620, false) },
+    { name: 'join', frames: 72, draw: shotAnswer },
+    { name: 'flight', frames: 96, draw: shotFlight },
+    { name: 'card', frames: 48, draw: endCard },
+  ],
+  sheet(H) { drawMeadow(H, 300); nightOver(H, 300); for (const [x, y, sz, pose] of [[180, 300, 1.4, { mood: -1, tilt: -.06 }], [540, 300, 2.2, { shut: 1 }], [880, 300, 1.4, { mood: 1, glow: 1, wing: 1, hop: 6 }], [540, 800, 3.4, { look: .5, mood: .3, glow: .15 }]]) H.view({ x: HERO_BASE.x, y: HERO_BASE.y - 30, zoom: sz, to: [x, y] }, () => { drawStem(H, 0); drawHero(H, 0, pose); }); },   // sad, trying, joyful (lit, wings open), and a large neutral one
+  score,
+  cues: [{ name: 'together', frame: F_JOIN, gate: true }, { name: 'answer', frame: F_ANSWER }],
+});
+
+// @score-begin   (render.mjs leaves everything down to @score-end out of the frame stamp)
+// ---- SOUND: the score reads the simulation. Every flash is a note; where a fly sits decides its pitch.
+function score(K, TL) {
+  const F = TL.frame, R = streamOf('score'), SC = scaleOf('g4', 'pentatonic', 2), beat = 60 / TL.bpm;
+  const pitchOf = x => SC[clamp(Math.floor(x / FW * SC.length), 0, SC.length - 1)];
+  K.pad(0, F(216), chordOf('g3', 'add9'), .04); K.pad(F(216), F(144), chordOf('e3', 'min7'), .045);
+  K.pad(F(360), F(72), chordOf('c3', 'maj7'), .05); K.pad(F(432), F(96), chordOf('c3', 'add9'), .05); K.pad(F(528), F(48) + .5, chordOf('g3', 'add9'), .055);
+  for (let t = .3; t < F(216); t += rd(R, .4, 2.6)) if (ch(R, .6)) K.fx.chirp(t, .018, rd(R, 3600, 4900), ri(R, 1, 3));  // crickets, sparse and irregular
+  K.fx.wind(0, F(FR), .035, R);
+  for (let f = 0; f < FR; f++) { const list = SIM.at[f]; if (!list.length) continue;
+    if (list.length <= 4) { let n = 0; for (const q of list) if (q.i % 2 === 0 && n++ < 2) K.keys(F(f) + n * .011, pitchOf(q.x), .07, 1.3); continue; }
+    const hz = [...new Set(list.map(q => pitchOf(q.x)))].sort((a, b) => a - b), pick = hz.length <= 5 ? hz : [0, 1, 2, 3, 4].map(i => hz[Math.round(i * (hz.length - 1) / 4)]);
+    const fade = 1 - sstep(528, 568, f); pick.forEach((h, i) => K.keys(F(f) + i * .009, h, fade * .11 / Math.sqrt(pick.length) * Math.min(1, list.length / 30), 1.5));   // strummed a few ms apart: no click
+    if (list.length >= 38 && fade > .05) K.bell(F(f) + .02, SC[0] / 2, .05 * fade); }
+  for (const f of SIM.heroFl) if (f < F_JOIN) K.pluck(F(f), NOTE.g6, .17, .8);                                    // the late one, alone: higher, and on its own
+  K.fx.thump(F(F_JOIN), .45, 80); K.bell(F(F_JOIN) + .012, NOTE.g5, .24); K.pluck(F(F_JOIN) + .024, NOTE.g6, .16, 1); K.fx.chime(F(F_JOIN) + .02, .14, NOTE.b6); K.fx.sparkle(F(F_JOIN) + .08, 1.1, .05, R);
+  for (const f of SIM.answerFl) K.bell(F(f), NOTE.b5, f === F_ANSWER ? .14 : .08);                             // the answer from the grass
+  K.arp(F(440), scaleOf('c5', 'pentatonic', 2).slice(0, 11), beat / 2, { inst: K.pluck, g: .12, dur: .9 });                 // rising with them
+  for (let t = F(432); t < F(527); t += .12) K.fx.buzz(t, .1, .012, 170);                                                    // soft wingbeats
+  K.bell(F(528), NOTE.g4, .24); K.keys(F(528) + beat * 2, NOTE.d6, .1, 2);
+}
+// @score-end
+</script>
+</body></html>

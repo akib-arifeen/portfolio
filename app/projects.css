@@ -48,3 +48,61 @@
 @media (prefers-reduced-motion: reduce) {
   .projects *, .pcard { transition-duration: 0.01ms !important; transform: none !important; }
 }
+
+/* ── Creative media ──────────────────────────────────────────────
+   A gallery, not a product grid: the clip is the object, the caption explains it. */
+.gallery {
+  display: grid;
+  gap: var(--space-lg);
+  padding-top: var(--space-2xl);
+  border-top: var(--rule-thick) solid var(--color-ink);
+}
+.gallery__sub { font-size: var(--text-lg); margin-top: var(--space-lg); }
+.gallery__note { max-width: 62ch; color: var(--color-ink-2); font-size: var(--text-sm); }
+.gallery__grid {
+  display: grid;
+  gap: var(--space-xl) var(--space-md);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 21rem), 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.gpiece { display: grid; gap: var(--space-sm); align-content: start; margin: 0; }
+.gpiece__slot { display: grid; }
+.gpiece__video, .gpiece__frame {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 78vh;
+  border-radius: var(--radius-md);
+  background: var(--color-paper-3);
+  object-fit: contain;
+}
+.gpiece__video { max-width: 100%; }
+.gpiece__frame { border: 0; aspect-ratio: 1; max-height: none; }
+.gpiece__cap { display: grid; gap: var(--space-2xs); }
+.gpiece__title { font-size: var(--text-md); }
+.gpiece__line { color: var(--color-ink-2); font-size: var(--text-sm); }
+.gpiece__meta { color: var(--color-muted); font-family: var(--font-outlier); font-size: var(--text-sm); }
+.gpiece__toggle {
+  justify-self: start;
+  min-height: 2.75rem;
+  padding: 0 var(--space-lg);
+  border: var(--rule-hair) solid var(--color-ink);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+@media (hover: hover) and (pointer: fine) {
+  .gpiece__toggle:hover { background: var(--color-paper-3); }
+}
+
+.gallery__credits { display: grid; gap: var(--space-md); margin-top: var(--space-lg); }
+.gallery__pairs { display: grid; gap: var(--space-md); margin: 0; }
+.gallery__pair { display: grid; gap: var(--space-2xs); max-width: 62ch; }
+.gallery__pair dt { font-size: var(--text-sm); color: var(--color-muted); }
+.gallery__pair dd { margin: 0; color: var(--color-ink-2); font-size: var(--text-sm); }

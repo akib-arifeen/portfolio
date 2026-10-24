@@ -85,7 +85,11 @@ export function projectsIn(category: ProjectCategoryId): ProjectEntry[] {
   return projectEntries().filter((p) => p.category === category);
 }
 
-/** `?show=` is a URL, so it can be anything; only the four known values filter anything. */
-export function resolveShow(value: string | undefined): "all" | ProjectCategoryId {
+/** What `/projects?show=` can select: one category, the media gallery, or everything. */
+export type ProjectShow = "all" | ProjectCategoryId | "media";
+
+/** `?show=` is a URL, so it can be anything; only the known values select anything. */
+export function resolveShow(value: string | undefined): ProjectShow {
+  if (value === "media") return "media";
   return value === "products" || value === "games" || value === "experiments" ? value : "all";
 }

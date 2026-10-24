@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CATEGORIES, projectEntries, projectsIn, resolveShow } from "@/lib/projects";
+import { MediaGallery } from "@/components/projects/MediaGallery";
 import "../work.css";
 import "../projects.css";
 
 const DESCRIPTION =
-  "Every project in one place: the products, the games and the experiments, each with the status it actually has.";
+  "Every project in one place: the products, the games and the experiments, each with the status it actually has, plus a gallery of motion work.";
 
 export const metadata: Metadata = {
   title: "Projects",
@@ -15,12 +16,17 @@ export const metadata: Metadata = {
 
 type Props = { searchParams: Promise<{ show?: string }> };
 
-const FILTERS = [{ id: "all", label: "All" }, ...CATEGORIES.map((c) => ({ id: c.id, label: c.title }))];
+const FILTERS = [
+  { id: "all", label: "All" },
+  ...CATEGORIES.map((c) => ({ id: c.id as string, label: c.title })),
+  { id: "media", label: "Media" },
+];
 
 export default async function ProjectsPage({ searchParams }: Props) {
   const { show } = await searchParams;
   const active = resolveShow(show);
   const groups = CATEGORIES.filter((c) => active === "all" || c.id === active);
+  const showMedia = active === "all" || active === "media";
   const total = projectEntries().length;
 
   return (
@@ -79,6 +85,8 @@ export default async function ProjectsPage({ searchParams }: Props) {
           </section>
         );
       })}
+
+      {showMedia ? <MediaGallery /> : null}
     </main>
   );
 }

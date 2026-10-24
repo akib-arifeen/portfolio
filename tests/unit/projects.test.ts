@@ -83,10 +83,11 @@ describe("the catalog", () => {
 });
 
 describe("resolveShow", () => {
-  it("accepts the four values that mean something", () => {
+  it("accepts the values that mean something", () => {
     expect(resolveShow(undefined)).toBe("all");
     expect(resolveShow("all")).toBe("all");
     for (const id of IDS) expect(resolveShow(id)).toBe(id);
+    expect(resolveShow("media")).toBe("media");
   });
 
   it("falls back to everything for anything else", () => {
