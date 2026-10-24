@@ -366,11 +366,11 @@ function target(pose: AkibPose, t: number, tw: number, glance: number, mot: numb
   o[KNEE] = mot * s(t * 1.1) * 0.07;
   // resting arms-at-the-keys values, reused by typing, nod
   const keys = (speed: number, amp: number) => {
-    o[R_X] = -0.5; o[L_X] = -0.5;
+    o[R_X] = -1.15; o[L_X] = -1.15;
     o[R_Y] = 0.45; o[L_Y] = 0.75;
     o[R_Z] = -0.05; o[L_Z] = 0.05;
-    o[R_EL] = -0.95 + mot * amp * 0.06 * s(t * speed);
-    o[L_EL] = -0.95 + mot * amp * 0.06 * s(t * speed + Math.PI);
+    o[R_EL] = -0.7 + mot * amp * 0.06 * s(t * speed);
+    o[L_EL] = -0.7 + mot * amp * 0.06 * s(t * speed + Math.PI);
     o[R_WR] = mot * amp * 0.14 * s(t * speed + 0.6);
     o[L_WR] = mot * amp * 0.14 * s(t * speed + Math.PI + 0.6);
   };
@@ -383,7 +383,7 @@ function target(pose: AkibPose, t: number, tw: number, glance: number, mot: numb
   switch (pose) {
     case "typing": {
       const amp = 0.7 + 0.3 * s(t * 0.8);
-      o[HIPS] = 0.75; o[SPINE] = -0.05; o[HEAD] = 1.15 + glance * 0.35;
+      o[HIPS] = 0.2; o[SPINE] = -0.05; o[HEAD] = 0.8 + glance * 0.35;
       o[LEAN] = 0.16; o[PITCH] = 0.1 + mot * 0.02 * s(t * 0.8);
       o[SMILE] = 0.9;
       o[MOUTH] = 0.15;
@@ -586,7 +586,7 @@ export default function Akib(props: AkibProps) {
   const eyeZ = 0.3 * Math.cos(0.42) * Math.cos(eyeLat) + 0.022;
 
   return (
-    <group position={[-0.6, 0.7, -1.55]} rotation={[0, Math.PI, 0]} dispose={null}>
+    <group position={[-0.6, 0.7, -1.88]} rotation={[0, Math.PI, 0]} dispose={null}>
       <group scale={0.9}>
         <group ref={hips} position={[0, 0.12, 0]}>
           <mesh geometry={g.unit} material={m.pants} scale={[0.25, 0.14, 0.2]} castShadow />

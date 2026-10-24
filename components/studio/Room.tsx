@@ -103,10 +103,10 @@ export function Room({ sky }: { sky: string }) {
         <Box key={`${x}${z}`} size={[0.08, 0.95, 0.08]} position={[x, 0.5, z]} color={c.deskLeg} />
       ))}
 
-      {/* stool */}
-      <Cyl r={0.34} h={0.08} position={[-0.6, 0.66, -1.55]} color={c.stool} cast />
-      <Cyl r={0.05} h={0.62} position={[-0.6, 0.33, -1.55]} color={c.metal} segments={8} />
-      <Cyl r={0.3} h={0.04} position={[-0.6, 0.04, -1.55]} color={c.metal} />
+      {/* stool — tucked at the desk, where he actually sits */}
+      <Cyl r={0.34} h={0.08} position={[-0.6, 0.66, -1.88]} color={c.stool} cast />
+      <Cyl r={0.05} h={0.62} position={[-0.6, 0.33, -1.88]} color={c.metal} segments={8} />
+      <Cyl r={0.3} h={0.04} position={[-0.6, 0.04, -1.88]} color={c.metal} />
 
       {/* rug */}
       <Cyl r={1.55} h={0.02} position={[-0.3, 0.04, -0.6]} color={c.rug} segments={40} cast={false} />

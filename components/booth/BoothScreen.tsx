@@ -8,7 +8,16 @@ export default function BoothScreen({ booth, width }: { booth: Booth; width: num
   const b = booth;
   const showCamera = b.step === "pose" || b.step === "countdown";
   return (
-    <div className="bscreen" style={{ width, height: Math.round(width * 0.7), fontSize: width / (width < 440 ? 29 : 34) }}>
+    <div className="bscreen" style={{ width, height: Math.round(width * 0.7), fontSize: width / (width < 340 ? 25 : width < 460 ? 28 : 33) }}>
+      <span className="bscreen__brand" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path className="bscreen__flame" d="M12.4 2.1c3.2 4.2 5 7 5 10a5 5 0 0 1-10 0c0-2.3 1.1-4.5 3-6.7.2 1.8.9 2.9 2 3.6.1-2.4.2-4.4 0-6.9Z" />
+          <path className="bscreen__band" d="M5.5 8.5c0-3.5 2.9-6 6.5-6s6.5 2.5 6.5 6" />
+          <circle className="bscreen__eye" cx="9.9" cy="11.8" r=".95" />
+          <circle className="bscreen__eye" cx="14.1" cy="11.8" r=".95" />
+        </svg>
+        Photo Studio
+      </span>
       {b.step === "intro" && (
         <div className="bscreen__intro">
           <p className="bscreen__big">Step up!</p>

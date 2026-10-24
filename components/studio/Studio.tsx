@@ -8,6 +8,7 @@ import { Box, Cyl, Room } from "./Room";
 import Akib, { type AkibPose } from "./Akib";
 import StudioFallback from "./StudioFallback";
 import { lights, scene as c, type Phase } from "./palette";
+import { BOOTH_FOV, BOOTH_POS, Booth, BoothRig, PrintedCard } from "./Photobooth";
 import { spotLabels, type StudioSpot } from "@/lib/content";
 
 type V3 = [number, number, number];
@@ -15,14 +16,14 @@ type V3 = [number, number, number];
 /** Where the camera looks when a spot is selected. */
 export const spotFocus: Record<StudioSpot, V3> = {
   video: [-0.55, 2.2, -3.0],
-  booth: [-0.5, 1.3, 2.35],
+  booth: [BOOTH_POS.x, 0.85, BOOTH_POS.z],
   lessons: [1.35, 2.15, -2.85],
   zoom: [1.95, 2.15, -2.85],
   workout: [2.55, 2.1, -2.85],
   culinary: [1.65, 1.45, -2.85],
-  mic: [-0.6, 1.25, -2.4],
-  me: [-0.6, 1.4, -1.55],
-  laptop: [-0.95, 1.3, -2.72],
+  mic: [0.62, 1.5, -2.45],
+  me: [-0.6, 1.4, -1.88],
+  laptop: [-0.39, 1.35, -2.74],
 };
 
 export type StudioProps = {
@@ -159,7 +160,7 @@ function Scene({ phase, selected, onSelect, onCycleLight, onHover, reducedMotion
       </mesh>
 
       {spot("video", [0, 0.75, 0], <Monitor phase={phase} playing={active && !reducedMotion && !boothMode} />)}
-      {spot("laptop", [0, 0.55, 0.2], <Laptop />)}
+      {spot("laptop", [0, 0.45, 0.2], <Laptop />)}
       <Lamp phase={phase} />
       {spot("mic", [0, 0.75, 0], <Mic />)}
       {spot("me", [0, 1.25, 0], <Akib reducedMotion={reducedMotion} pose={akibPose ?? (selected === "me" ? "wave" : "typing")} mouth={akibMouth} lookAtPointer headphonesOn={false} />)}
@@ -173,8 +174,8 @@ function Scene({ phase, selected, onSelect, onCycleLight, onHover, reducedMotion
       {spot("culinary", [0, 0.4, 0], <Pan />)}
       <Cyl r={0.09} h={0.18} position={[2.45, 1.43, -2.85]} color={c.cream} />
 
-      {spot("booth", [0, 1.55, 0], (
-        <Booth boothMode={boothMode} screen={boothMode && !cardLifted ? boothScreen : undefined} flashKey={flashKey} />
+      {spot("booth", [0, 0.75, 0], (
+        <Booth boothMode={boothMode} screen={boothMode && !cardLifted ? boothScreen : undefined} flashKey={flashKey} phase={phase} reducedMotion={reducedMotion} />
       ))}
       {boothMode && cardUrl && (
         <PrintedCard key={cardUrl} url={cardUrl} cam={persp} reducedMotion={reducedMotion}
@@ -228,7 +229,7 @@ function CameraRig({ cam: camRef, selected, reducedMotion }: { cam: React.RefObj
   useFrame((state, dt) => {
     const wide = size.width >= 960;
     // narrow: the plinth is 6.6 m square turned 45 degrees, so it is 9.3 m wide on screen; 10.2 keeps both sides in frame
-    const baseZoom = wide ? Math.min(size.width / 17, size.height / 9.6) : Math.min(size.width / 10.2, size.height / 7.4);
+    const baseZoom = wide ? Math.min(size.width / 15.6, size.height / 9.6) : Math.min(size.width / 10.2, size.height / 7.4);
     const viewWidth = size.width / baseZoom;
     let zoom = baseZoom;
 
@@ -357,8 +358,8 @@ function useMonitorTexture(playing: boolean) {
 
 function Monitor({ phase, playing }: { phase: Phase; playing: boolean }) {
   const tex = useMonitorTexture(playing);
-  // the screen is its own light: it brightens a little as the room darkens, but keeps the clip's true colours
-  const tint = useMemo(() => new THREE.Color().setScalar(Math.min(1, 0.7 + 0.2 * lights[phase].screenGlow)), [phase]);
+  // the screen is its own light: it brightens a little as the room darkens, but stays a step behind the laptop
+  const tint = useMemo(() => new THREE.Color().setScalar(Math.min(0.86, 0.62 + 0.16 * lights[phase].screenGlow)), [phase]);
   return (
     <group position={[-0.55, 2.35, -3.06]}>
       <Box size={[1.72, 1.02, 0.08]} position={[0, 0, 0]} color={c.screenFrame} cast />
@@ -393,6 +394,13 @@ function paintLaptopScreen(g: CanvasRenderingContext2D, w: number, h: number) {
   });
   g.globalAlpha = 1;
 
+  // corners fall away so the windows, not the wallpaper, carry the screen
+  const vignette = g.createRadialGradient(w * 0.5, h * 0.45, h * 0.18, w * 0.5, h * 0.45, w * 0.72);
+  vignette.addColorStop(0, "rgba(28,20,17,0)");
+  vignette.addColorStop(1, "rgba(28,20,17,0.36)");
+  g.fillStyle = vignette;
+  g.fillRect(0, 0, w, h);
+
   // menu bar: an "a" monogram, a few menu words as bars, status bits on the right
   g.fillStyle = "rgba(255,250,244,0.55)";
   g.fillRect(0, 0, w, 24);
@@ -408,6 +416,61 @@ function paintLaptopScreen(g: CanvasRenderingContext2D, w: number, h: number) {
   g.fillStyle = "rgba(56,50,45,0.6)";
   [34, 28, 32, 30].reduce((x, bw) => { g.fillRect(x, 9, bw, 6); return x + bw + 12; }, 40);
   [18, 12, 30].reduce((x, bw) => { g.fillRect(x - bw, 9, bw, 6); return x - bw - 10; }, w - 14);
+
+  // two windows of actual work: an editor with a few coloured lines, a terminal mid-build
+  const panel = (x: number, y: number, pw: number, ph: number, r: number) => {
+    g.beginPath(); g.roundRect(x, y, pw, ph, r); g.fill();
+  };
+  g.fillStyle = "rgba(30,26,24,0.94)";
+  panel(40, 36, 372, 238, 10);
+  g.fillStyle = "rgba(255,255,255,0.07)";
+  g.fillRect(40, 36, 372, 24);
+  ["#e8735c", "#e8b45c", "#86c58a"].forEach((col, i) => {
+    g.fillStyle = col;
+    g.beginPath(); g.arc(52 + i * 12, 48, 3.4, 0, Math.PI * 2); g.fill();
+  });
+  g.fillStyle = "rgba(255,255,255,0.42)";
+  g.font = "600 11px ui-monospace, monospace";
+  g.textAlign = "left";
+  g.fillText("studio.tsx", 98, 48.5);
+  const code: [number, string][] = [
+    [0, "#e2a76f"], [1, "#8fc7d8"], [1, "#b9d18a"], [2, "#d0a3c8"],
+    [2, "#e2c07a"], [1, "#8fc7d8"], [1, "#b9d18a"], [2, "#e2c07a"],
+    [1, "#d0a3c8"], [0, "#8fc7d8"],
+  ];
+  code.forEach(([indent, col], i) => {
+    const y = 84 + i * 19;
+    g.fillStyle = "rgba(255,255,255,0.18)";
+    g.fillRect(50, y - 2, 10, 4);
+    let x = 72 + indent * 15;
+    const widths = [34 + (i % 3) * 13, 18 + (i % 2) * 11, 48 - (i % 4) * 9, 13];
+    widths.forEach((bw, j) => {
+      g.fillStyle = j === 1 ? "rgba(255,255,255,0.5)" : col;
+      g.globalAlpha = j === 3 ? 0.5 : 0.92;
+      g.fillRect(x, y - 3, bw, 6);
+      x += bw + 8;
+    });
+    g.globalAlpha = 1;
+  });
+  g.fillStyle = "rgba(16,19,21,0.94)";
+  panel(428, 132, 196, 180, 10);
+  g.fillStyle = "rgba(255,255,255,0.32)";
+  g.font = "600 10px ui-monospace, monospace";
+  g.fillText("~/studio", 442, 150);
+  g.fillStyle = "#8fe3b0";
+  g.font = "11px ui-monospace, monospace";
+  g.fillText("$ npm run build", 442, 176);
+  g.fillStyle = "rgba(214,232,220,0.5)";
+  g.fillRect(442, 190, 96, 5);
+  g.fillRect(442, 205, 140, 5);
+  g.fillStyle = "rgba(143,227,176,0.85)";
+  g.fillRect(442, 220, 74, 5);
+  g.fillStyle = "#8fe3b0";
+  g.fillText("$ npm test", 442, 252);
+  g.fillStyle = "rgba(214,232,220,0.5)";
+  g.fillRect(442, 266, 118, 5);
+  g.fillStyle = "#8fe3b0";
+  g.fillRect(442, 284, 7, 11);
 
   // dock: one squircle per app, in dock order
   const icons: [string, string][] = [
@@ -450,17 +513,100 @@ function useLaptopScreenTexture() {
   return tex;
 }
 
+/** The deck seen from above: a keyboard well, real keys, a trackpad. Painted, not modelled — it has to read at 60 px and at 300. */
+function paintLaptopDeck(g: CanvasRenderingContext2D, w: number, h: number) {
+  g.fillStyle = "#cfc9be";
+  g.fillRect(0, 0, w, h);
+  const well = { x: w * 0.09, y: h * 0.1, w: w * 0.82, h: h * 0.56 };
+  g.fillStyle = "#bdb6aa";
+  g.beginPath();
+  g.roundRect(well.x, well.y, well.w, well.h, 8);
+  g.fill();
+  const cols = 14, rows = 5, gap = 3;
+  const cw = (well.w - gap * (cols + 1)) / cols;
+  const ch = (well.h - gap * (rows + 1)) / rows;
+  g.fillStyle = "#4b453d";
+  for (let r = 0; r < rows; r++) {
+    for (let col = 0; col < cols; col++) {
+      g.beginPath();
+      g.roundRect(well.x + gap + col * (cw + gap), well.y + gap + r * (ch + gap), cw, ch, 2);
+      g.fill();
+    }
+  }
+  // space bar: one wide key on the bottom row
+  g.fillStyle = "#cfc9be";
+  g.beginPath();
+  g.roundRect(well.x + well.w * 0.28, well.y + gap + 4 * (ch + gap), well.w * 0.44, ch, 2);
+  g.fill();
+  // trackpad
+  g.fillStyle = "#c4bdb1";
+  g.beginPath();
+  g.roundRect(w * 0.33, h * 0.73, w * 0.34, h * 0.21, 4);
+  g.fill();
+  g.strokeStyle = "rgba(90,84,76,0.35)";
+  g.lineWidth = 2;
+  g.stroke();
+  // speaker grilles either side of the keys
+  g.fillStyle = "rgba(90,84,76,0.28)";
+  for (const s of [0.035, 0.965]) {
+    for (let i = 0; i < 5; i++) {
+      g.beginPath();
+      g.arc(w * s, h * (0.16 + i * 0.055), 2.2, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+}
+
+function useLaptopDeckTexture() {
+  const tex = useMemo(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 340;
+    paintLaptopDeck(canvas.getContext("2d")!, 512, 340);
+    const t = new THREE.CanvasTexture(canvas);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    return t;
+  }, []);
+  useEffect(() => () => tex.dispose(), [tex]);
+  return tex;
+}
+
+const LAPTOP_POS: V3 = [-0.3, 1.07, -2.44];
+const LAPTOP_SCALE = 1.35;
+
 function Laptop() {
   const screen = useLaptopScreenTexture();
+  const deck = useLaptopDeckTexture();
   return (
-    <group position={[-0.95, 1.07, -2.5]}>
+    <group position={LAPTOP_POS} rotation={[0, 0.28, 0]} scale={LAPTOP_SCALE}>
+      {/* base: a milled slab with a painted keyboard deck on top */}
       <Box size={[0.64, 0.03, 0.44]} position={[0, 0, 0]} color={c.laptop} />
-      <group position={[0, 0.2, -0.24]} rotation={[-0.25, 0, 0]}>
+      <mesh position={[0, 0.0162, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[0.62, 0.42]} />
+        <meshStandardMaterial map={deck} roughness={0.62} metalness={0.05} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
+      </mesh>
+      {/* front lip and side ports */}
+      <Box size={[0.64, 0.006, 0.012]} position={[0, -0.004, 0.219]} color={c.laptopEdge} />
+      {[-0.06, -0.13].map((z) => (
+        <Box key={z} size={[0.008, 0.009, 0.042]} position={[0.322, 0.002, z]} color={c.laptopPort} />
+      ))}
+      {/* hinge */}
+      <Cyl r={0.013} h={0.575} position={[0, 0.021, -0.222]} rotation={[0, 0, Math.PI / 2]} color={c.laptopPort} segments={14} />
+      {/* lid */}
+      <group position={[0, 0.2, -0.24]} rotation={[-0.28, 0, 0]}>
         <Box size={[0.64, 0.42, 0.02]} position={[0, 0, 0]} color={c.laptop} />
         <mesh position={[0, 0.005, 0.0105]}>
-          <planeGeometry args={[0.58, 0.36]} />
-          <meshStandardMaterial map={screen} emissive="#ffffff" emissiveMap={screen} emissiveIntensity={0.55} roughness={0.5} />
+          <planeGeometry args={[0.575, 0.36]} />
+          <meshBasicMaterial map={screen} toneMapped={false} />
         </mesh>
+        {/* camera pinhole */}
+        <mesh position={[0, 0.197, 0.0112]}>
+          <circleGeometry args={[0.0038, 10]} />
+          <meshBasicMaterial color="#2a2724" />
+        </mesh>
+        {/* screen spill on the keys and his hands */}
+        <pointLight position={[0, -0.03, 0.3]} color="#ffd7ad" intensity={0.12} distance={1} decay={2} />
       </group>
     </group>
   );
@@ -496,7 +642,7 @@ function Mic() {
   return (
     <group>
       {/* microphone */}
-      <group position={[0.05, 1.07, -2.3]}>
+      <group position={[0.62, 1.07, -2.45]}>
         <Cyl r={0.1} h={0.03} position={[0, 0.01, 0]} color={c.metal} />
         <Cyl r={0.015} h={0.4} position={[0, 0.22, 0]} color={c.metal} segments={6} />
         <mesh position={[0, 0.48, 0]} castShadow>
@@ -550,216 +696,5 @@ function Pan() {
       <Cyl r={0.2} h={0.06} position={[0, 0, 0]} color={c.metal} segments={20} />
       <Box size={[0.3, 0.03, 0.05]} position={[0.32, 0.01, 0.06]} rotation={[0, -0.4, 0]} color={c.desk} />
     </group>
-  );
-}
-
-/** Text painted onto a canvas, so the booth can carry words without a font download. */
-function useLabelTexture(text: string, bg: string, fg: string, w = 512, h = 256, size = 120) {
-  const tex = useMemo(() => {
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const g = canvas.getContext("2d")!;
-    g.fillStyle = bg;
-    g.fillRect(0, 0, w, h);
-    g.fillStyle = fg;
-    g.textAlign = "center";
-    g.textBaseline = "middle";
-    const family = getComputedStyle(document.documentElement).getPropertyValue("--font-fraunces").trim() || "Georgia";
-    g.font = `500 ${size}px ${family}, Georgia, serif`;
-    g.fillText(text, w / 2, h / 2 + size * 0.05);
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    return tex;
-  }, [text, bg, fg, w, h, size]);
-  useEffect(() => () => tex.dispose(), [tex]); // every booth round trip remounts these; without this the GPU keeps each copy
-  return tex;
-}
-
-/* ── The photobooth: a working screen, a flash, a printer ───────────── */
-
-const BOOTH_POS = new THREE.Vector3(-0.5, 0, 2.35);
-const BOOTH_ROT = Math.PI / 4;
-const BOOTH_FWD = new THREE.Vector3(Math.sin(BOOTH_ROT), 0, Math.cos(BOOTH_ROT));
-const BOOTH_FOV = 35;
-const SCREEN_W = 0.8, SCREEN_H = 0.56, SCREEN_Y = 1.45, SLOT_Y = 0.82;
-const toWorld = (x: number, y: number, z: number) =>
-  new THREE.Vector3(x, y, z).applyAxisAngle(new THREE.Vector3(0, 1, 0), BOOTH_ROT).add(BOOTH_POS);
-const SCREEN_CENTRE = toWorld(0, SCREEN_Y, 0.46);
-const SLOT = toWorld(0, SLOT_Y, 0.5);
-
-/** How far to stand from the booth so its screen and printer slot both fit, and how wide the screen renders in CSS px. */
-function boothView(width: number, height: number) {
-  const t = Math.tan(THREE.MathUtils.degToRad(BOOTH_FOV / 2));
-  const aspect = width / height;
-  const narrow = width < 640;
-  const fill = narrow ? 0.94 : 0.82;
-  const d = Math.max(1.75 / (2 * t), SCREEN_W / fill / (2 * t * aspect)); // 1.75 m of booth in view: sign to slot
-  const visibleW = 2 * d * t * aspect;
-  return { d, domW: Math.round((SCREEN_W / visibleW) * width) };
-}
-
-/** Walk up to the booth: start a step back and a little high, settle at eye level in front of the screen. */
-function BoothRig({ cam: camRef, active, reducedMotion }: { cam: React.RefObject<THREE.PerspectiveCamera | null>; active: boolean; reducedMotion: boolean }) {
-  const { size } = useThree();
-  const entered = useRef(false);
-  const goal = useMemo(() => new THREE.Vector3(), []);
-  const look = useMemo(() => new THREE.Vector3(), []);
-  useFrame((state, dt) => {
-    const cam = camRef.current;
-    if (!cam) return;
-    if (!active) { entered.current = false; return; }
-    const { d } = boothView(size.width, size.height);
-    look.copy(SCREEN_CENTRE).setY(1.45);
-    goal.copy(look).addScaledVector(BOOTH_FWD, d).setY(1.55);
-    if (!reducedMotion) goal.x += state.pointer.x * 0.04, goal.y += state.pointer.y * 0.03;
-    if (!entered.current) {
-      entered.current = true;
-      cam.position.copy(goal).addScaledVector(BOOTH_FWD, reducedMotion ? 0 : 1.6).setY(reducedMotion ? goal.y : 2.3);
-    }
-    const k = reducedMotion ? 1 : 1 - Math.exp(-dt * 2.4);
-    cam.position.lerp(goal, k);
-    cam.lookAt(look);
-  });
-  return null;
-}
-
-function Booth({ boothMode, screen, flashKey }: { boothMode: boolean; screen?: (width: number) => ReactNode; flashKey: number }) {
-  const [fontsReady, setFontsReady] = useState(false);
-  useEffect(() => { document.fonts.ready.then(() => setFontsReady(true)); }, []);
-  const { size } = useThree();
-  const { domW } = boothView(size.width, size.height);
-  const flash = useRef<THREE.PointLight>(null);
-  const strip = useRef<THREE.MeshStandardMaterial>(null);
-  const firedAt = useRef<number | null>(null);
-  const lastKey = useRef(flashKey);
-
-  useFrame(() => {
-    if (flashKey !== lastKey.current) { lastKey.current = flashKey; firedAt.current = now(); }
-    const age = firedAt.current === null ? 99 : now() - firedAt.current;
-    const burst = Math.exp(-age * 12);
-    if (flash.current) flash.current.intensity = 90 * burst;
-    if (strip.current) strip.current.emissiveIntensity = 0.15 + 6 * burst;
-  });
-
-  return (
-    <group position={BOOTH_POS.toArray()} rotation={[0, BOOTH_ROT, 0]}>
-      <Box size={[1.16, 0.12, 0.96]} position={[0, 0.06, 0]} color={c.coralDark} cast />
-      <Box size={[1.1, 2.2, 0.9]} position={[0, 1.2, 0]} color={c.coral} cast />
-      <Box size={[1.24, 0.34, 0.98]} position={[0, 2.46, 0]} color={c.cream} cast />
-      <BoothSign key={fontsReady ? "ready" : "loading"} />
-      {/* flash strip and lens above the screen */}
-      <mesh position={[0, 2.08, 0.455]}>
-        <boxGeometry args={[0.56, 0.06, 0.02]} />
-        <meshStandardMaterial ref={strip} color="#fff7ea" emissive="#fff7ea" emissiveIntensity={0.15} />
-      </mesh>
-      {/* camera lens: a cream ring, dark glass, one highlight */}
-      <Cyl r={0.085} h={0.05} position={[0, 1.88, 0.46]} rotation={[Math.PI / 2, 0, 0]} color={c.cream} segments={24} />
-      <Cyl r={0.06} h={0.06} position={[0, 1.88, 0.47]} rotation={[Math.PI / 2, 0, 0]} color="#1d2733" segments={24} />
-      <mesh position={[0.022, 1.9, 0.502]}>
-        <circleGeometry args={[0.012, 12]} />
-        <meshBasicMaterial color="#e9eef5" />
-      </mesh>
-      <pointLight ref={flash} position={[0, 2.0, 1.1]} color="#fff6e8" intensity={0} distance={6} decay={1.4} />
-      {/* screen: a bezel, and either the live interface (booth mode) or a resting picture */}
-      <Box size={[SCREEN_W + 0.08, SCREEN_H + 0.08, 0.03]} position={[0, SCREEN_Y, 0.45]} color={c.screenFrame} />
-      {screen ? (
-        <Html transform distanceFactor={(SCREEN_W * 400) / domW} position={[0, SCREEN_Y, 0.468]} zIndexRange={[20, 0]}>
-          {screen(domW)}
-        </Html>
-      ) : (
-        <BoothRestScreen key={fontsReady ? "r" : "l"} text={boothMode ? "Enjoy!" : "Step up"} />
-      )}
-      {/* printer slot; in the room a card rests half out, in booth mode the real one prints */}
-      <Box size={[0.52, 0.05, 0.05]} position={[0, SLOT_Y, 0.46]} color={c.screenFrame} />
-      {!boothMode && <Box size={[0.34, 0.02, 0.22]} position={[0, 0.8, 0.56]} rotation={[0.25, 0, 0]} color={c.cream} />}
-    </group>
-  );
-}
-
-function BoothSign() {
-  const sign = useLabelTexture("PHOTOS", "#f5ecdf", "#b8503e", 512, 128, 84);
-  return (
-    <mesh position={[0, 2.46, 0.495]}>
-      <planeGeometry args={[1.1, 0.28]} />
-      <meshStandardMaterial map={sign} roughness={0.8} />
-    </mesh>
-  );
-}
-
-function BoothRestScreen({ text }: { text: string }) {
-  const tex = useLabelTexture(text, "#2b2927", "#f5ecdf", 512, 358, 92);
-  return (
-    <mesh position={[0, SCREEN_Y, 0.467]}>
-      <planeGeometry args={[SCREEN_W, SCREEN_H]} />
-      <meshStandardMaterial map={tex} emissive="#ffffff" emissiveMap={tex} emissiveIntensity={0.6} roughness={0.4} />
-    </mesh>
-  );
-}
-
-/** The print: feeds down out of the slot, then lifts up to eye level and turns to face you. */
-function PrintedCard({ url, cam, reducedMotion, onLift, onPresented }: {
-  url: string; cam: React.RefObject<THREE.PerspectiveCamera | null>; reducedMotion: boolean; onLift: () => void; onPresented: () => void;
-}) {
-  const CW = 0.3, CH = 0.3 * (1330 / 900);
-  const tex = useMemo(() => { const t = new THREE.TextureLoader().load(url); t.colorSpace = THREE.SRGBColorSpace; return t; }, [url]);
-  const geo = useMemo(() => new THREE.PlaneGeometry(CW, CH).translate(0, -CH / 2, 0), [CH]); // origin on the top edge
-  const ref = useRef<THREE.Mesh>(null);
-  const born = useRef<number | null>(null);
-  const lifted = useRef(false);
-  const shown = useRef(false);
-  const { size } = useThree();
-  const slotQuat = useMemo(() => new THREE.Quaternion().setFromEuler(new THREE.Euler(0.1, BOOTH_ROT, 0, "YXZ")), []);
-  const from = useMemo(() => new THREE.Vector3(), []);
-  const to = useMemo(() => new THREE.Vector3(), []);
-  const camQuat = useMemo(() => new THREE.Quaternion(), []);
-  const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
-
-  useEffect(() => () => { tex.dispose(); geo.dispose(); }, [tex, geo]);
-
-  useFrame((state) => {
-    const m = ref.current, c0 = cam.current;
-    if (!m || !c0) return;
-    if (born.current === null) born.current = now();
-    const age = now() - born.current;
-    const FEED = reducedMotion ? 0 : 1.7, PAUSE = reducedMotion ? 0 : 0.35, LIFT = reducedMotion ? 0 : 1.1;
-
-    // where it ends: in front of the camera, a touch low, sized to fit the view
-    const t = Math.tan(THREE.MathUtils.degToRad(BOOTH_FOV / 2));
-    const dist = 0.95;
-    const visH = 2 * dist * t, visW = visH * (size.width / size.height);
-    const scale = Math.min(0.62 * visH / CH, 0.8 * visW / CW);
-    c0.getWorldDirection(to);
-    to.multiplyScalar(dist).add(c0.position);
-    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(c0.quaternion);
-    to.addScaledVector(up, (CH * scale) / 2 + visH * 0.04);
-    camQuat.copy(c0.quaternion);
-
-    if (age < FEED) {
-      m.position.copy(SLOT);
-      m.quaternion.copy(slotQuat);
-      m.scale.set(1, Math.max(0.001, age / FEED), 1);
-    } else if (age < FEED + PAUSE) {
-      m.scale.set(1, 1, 1);
-    } else {
-      if (!lifted.current) { lifted.current = true; from.copy(m.position); onLift(); }
-      const p = LIFT === 0 ? 1 : Math.min(1, (age - FEED - PAUSE) / LIFT);
-      const e = ease(p);
-      m.position.lerpVectors(from, to, e);
-      m.position.y += Math.sin(p * Math.PI) * 0.12; // a little arc, like being picked up
-      m.quaternion.slerpQuaternions(slotQuat, camQuat, e);
-      const sc = 1 + (scale - 1) * e;
-      m.scale.set(sc, sc, sc);
-      if (p >= 1 && !shown.current) { shown.current = true; onPresented(); }
-      if (p >= 1 && !reducedMotion) m.position.addScaledVector(up, Math.sin(state.clock.elapsedTime * 1.4) * 0.004);
-    }
-  });
-
-  return (
-    <mesh ref={ref} geometry={geo} renderOrder={10}>
-      {/* photo paper reads bright under any room light */}
-      <meshStandardMaterial map={tex} emissive="#ffffff" emissiveMap={tex} emissiveIntensity={0.55} roughness={0.45} side={THREE.DoubleSide} />
-      {/* ds-allow-hardcode:end */}
-    </mesh>
   );
 }

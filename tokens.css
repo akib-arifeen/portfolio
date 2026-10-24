@@ -42,6 +42,12 @@
   --color-booth-rule:   oklch(62% 0.1 35);
   --color-booth-shadow: oklch(20% 0.06 33 / 0.5);
 
+  /* the ARI booth identity — used sparingly against the booth's warm coral */
+  --color-ari:      oklch(68% 0.13 228);
+  --color-ari-gold: oklch(76% 0.11 80);
+  --color-ari-ink:  oklch(24% 0.05 250);
+  --color-ari-rim:  oklch(68% 0.13 228 / 0.38);
+
   /* ── akibOS — the laptop layer: macOS-like chrome and glass, light + dark.
      The chrome worker owns these VALUES and may add --os-* tokens here; the names below are the contract. ── */
   --os-font: -apple-system, BlinkMacSystemFont, system-ui, var(--font-geist), sans-serif;
