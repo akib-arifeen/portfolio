@@ -44,7 +44,7 @@ export default async function ProjectsPage({ searchParams }: Props) {
         <h1 className="projects__h1">Projects</h1>
         <p className="projects__lede">
           {total} projects, each listed once, with the status it actually has rather than the one that would read
-          best. Most have a written case study; the games have a slice you can play.
+          best. Most have a Blog post; the games have a slice you can play.
         </p>
       </header>
 

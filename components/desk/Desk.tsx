@@ -2,49 +2,68 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import OsShell from "@/components/os/OsShell";
-import PhoneShell from "@/components/os/PhoneShell";
+import ProjectPortal from "@/components/portal/ProjectPortal";
+import { studioSound } from "@/lib/sound";
 import { useScrollLock } from "@/lib/use-scroll-lock";
+import "@/components/portal/portal.css";
 
-function useWide() {
-  const [wide, setWide] = useState<boolean | null>(null);
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 60rem)");
-    setWide(mq.matches);
-    const on = () => setWide(mq.matches);
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, []);
-  return wide;
-}
+const FOCUSABLE = "a[href], button:not([disabled]), video[controls], iframe, [tabindex]:not([tabindex='-1'])";
 
-/** The laptop: akibOS on wide screens, a phone home screen on narrow ones. Same apps either way. */
-export default function Desk({ onClose }: { onClose: () => void }) {
-  const wide = useWide();
+export default function Desk({ onClose, phone = false }: { onClose: () => void; phone?: boolean }) {
   const [leaving, setLeaving] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  // the page behind the laptop must not scroll while it is open
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useScrollLock();
 
   const close = useCallback(() => {
+    if (closeTimer.current) return;
+    studioSound.blip("click");
     setLeaving(true);
-    setTimeout(onClose, 220);
+    closeTimer.current = setTimeout(onClose, 140);
   }, [onClose]);
 
-  // focus moves into the dialog once the shell is known (the first render returns null)
-  useEffect(() => { if (wide !== null) root.current?.focus(); }, [wide]);
-
-  // the page behind the laptop must not take focus or be read by a screen reader while it is open
   useEffect(() => {
-    const els = Array.from(document.querySelectorAll<HTMLElement>("main, header.nav, nav")).filter((el) => !el.inert);
+    root.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close();
+        return;
+      }
+      if (event.key !== "Tab" || !root.current) return;
+      const items = Array.from(root.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => el.getClientRects().length > 0);
+      if (items.length === 0) {
+        event.preventDefault();
+        root.current.focus();
+        return;
+      }
+      const first = items[0], last = items[items.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || active === root.current)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [close]);
+
+  useEffect(() => {
+    const els = Array.from(document.querySelectorAll<HTMLElement>("main, header.nav, nav")).filter((el) => !root.current?.contains(el) && !el.inert);
     els.forEach((el) => { el.inert = true; });
     return () => els.forEach((el) => { el.inert = false; });
   }, []);
 
-  if (wide === null) return null;
+  useEffect(() => () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+  }, []);
+
   return createPortal(
-    <div className="desk" data-leaving={leaving} ref={root} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Akib’s laptop">
-      {wide ? <OsShell onExit={close} /> : <PhoneShell onExit={close} />}
+    <div className="desk" data-leaving={leaving} ref={root} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`Akib’s ${phone ? "phone" : "laptop"}`}>
+      <ProjectPortal onClose={close} phone={phone} />
     </div>,
     document.body,
   );

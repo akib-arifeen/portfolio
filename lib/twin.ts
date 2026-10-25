@@ -30,7 +30,7 @@ export type TwinAnswer = {
 
 // Only published case studies get a button; a draft would be a 404.
 const readCase = (slug: string): TwinEntry["action"] =>
-  getWork(slug) ? { label: "Read the case study", run: { type: "href", href: `/blog/${slug}` } } : undefined;
+  getWork(slug) ? { label: "Read the Blog", run: { type: "href", href: `/blog/${slug}` } } : undefined;
 
 /** The curated entries (>= 30), written only from WORK_RECORD.md, the CV and PORTFOLIO_PLAN.md §14. */
 export const entries: TwinEntry[] = [
@@ -339,16 +339,16 @@ export const entries: TwinEntry[] = [
     id: "site",
     questions: ["How was this site built?", "How did you create this room", "What is this site made with"],
     keywords: ["site", "website", "three", "threejs", "r3f", "webgl", "3d", "room", "nextjs", "laptop", "desktop"],
-    answer: "The studio is a 3D scene built in code with three.js and React Three Fiber on Next.js, and the character is built in code too. Click the objects to see the projects behind them, walk up to the photobooth, or open my laptop for a small desktop with notes, photos, music and a terminal.",
+    answer: "The studio is a 3D scene built in code with three.js and React Three Fiber on Next.js. Click the objects to see the projects behind them, walk up to the photobooth, or open my laptop for the workspace with the Blogs, projects, profile and the photobooth.",
     sources: ["lib/content.ts (studio notes)", "PORTFOLIO_PLAN.md §12, §13"],
     followUps: ["character", "design", "stack"],
   },
   {
     id: "character",
     questions: ["Who is the character at the desk?", "Is that you in the room", "Describe your 3D avatar"],
-    keywords: ["avatar", "glasses", "headphones", "hair", "model", "resident", "cartoon"],
-    answer: "That's a stylised me, built in code from a few casual photos: swept hair with brown tips, round glasses, headphones around my neck. He types when you're not looking and waves if you click him. Turn sound on and he talks back.",
-    sources: ["lib/content.ts (studio notes)"],
+    keywords: ["avatar", "glb", "gltf", "rocketbox", "model", "resident", "character", "3d"],
+    answer: "The character is a modified Microsoft Rocketbox Business_Male_03, shipped as a GLB with laptop and phone poses. It has short dark hair, rectangular gunmetal glasses and dark smart-casual clothing, and it is not a VRoid model or a live AI person.",
+    sources: ["CREDITS.md (Rocketbox/MIT)", "public/studio/avatar/README.md"],
     followUps: ["site", "how-chat", "who"],
   },
   {

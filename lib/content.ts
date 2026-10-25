@@ -81,9 +81,9 @@ export const studioNotes: Record<"mic" | "me", { kicker: string; title: string; 
     outcome: "Turn sound on to hear the studio.",
   },
   me: {
-    kicker: "At the desk",
-    title: "That’s me",
-    body: "A stylised me, built in code from a few casual photos: swept hair with brown tips, round glasses, headphones around my neck. He types when you’re not looking. Press Ask me and he’ll answer questions about my work, out loud if your sound is on.",
+    kicker: "At the workstation",
+    title: "Ask about the build",
+    body: "My seat at the workstation, next to the laptop. Ask me about the agent pipelines, render infrastructure, product decisions and verification behind the work, out loud if your sound is on.",
     outcome: "Software engineer · Hong Kong",
   },
 };

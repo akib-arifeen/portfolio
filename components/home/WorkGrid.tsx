@@ -49,7 +49,7 @@ function Card({ work, large }: { work: Work; large: boolean }) {
             <span>{work.outcome.note}</span>
           </p>
         ) : null}
-        {large ? <span className="hcard__cta" aria-hidden="true">Read the case study &rarr;</span> : null}
+        {large ? <span className="hcard__cta" aria-hidden="true">Read the Blog &rarr;</span> : null}
       </div>
     </li>
   );

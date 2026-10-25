@@ -6,7 +6,7 @@ I am Akib Arifeen, a software engineer in Hong Kong at See Change Education (Asi
 
 ## What is in here
 
-- **The 3D studio.** A React Three Fiber room with a desk, a monitor loop and a character. Click a spot to read about a project.
+- **The 3D studio.** A React Three Fiber room with a walnut desk, the laptop, a warm lamp and the photobooth. The person at the desk is a modified Microsoft Rocketbox game character loaded from a GLB with laptop and phone poses; a missing asset leaves the empty stool. Click a spot to read about a project.
 - **The photobooth.** A 3D booth and a screen UI. It sends your photo to an image model through `app/api/booth/route.ts`. There is a free mock mode that spends nothing.
 - **The laptop layer.** A desktop-style shell (windows, dock, menu bar, search, terminal, notes, photos, a small browser and a playground). On a phone it becomes a full screen app launcher.
 - **Case studies.** One page per project under `/blog/<slug>`, written from my own work record. Media lives in `public/work`.
@@ -70,13 +70,15 @@ app/            routes, layout, metadata, sitemap, robots, social image, icons
   play/         /play/[slug] pages for games that run inside the site
   api/booth/    photobooth endpoint
 components/
-  studio/       the 3D room
+  studio/       the 3D room, the avatar slot, the booth in the room
+  twin/         Ask Akib
   booth/        the photobooth screen
   desk/         the laptop entry point
   os/           the laptop shell: windows, dock, menu bar, apps
   work/         case study blocks
 lib/            content, case study data (lib/cases), laptop logic (lib/os)
-public/         CV, studio loop, work media, desk photos
+public/         CV, studio posters, work media, desk photos
+  studio/avatar/  the Rocketbox GLB, MIT notice and asset README
 tests/unit/     vitest tests for the laptop logic
 tokens.css      design tokens, the only place colours are defined
 ```

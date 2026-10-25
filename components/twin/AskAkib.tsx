@@ -5,15 +5,10 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import "./twin.css";
 import { STARTERS, answer, entries, type TwinAnswer } from "@/lib/twin";
 import { studioSound } from "@/lib/sound";
-import type { AkibPose } from "../studio/Akib";
-
-export type AkibState = { pose: AkibPose; mouth?: number };
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  /** Reports the character's pose and mouth while the panel is open; null once it closes. */
-  onAkib: (state: AkibState | null) => void;
   soundOn: boolean;
   /** Turns the site's sound on or off (Hero owns it). */
   onToggleSound: () => Promise<void>;
@@ -27,10 +22,6 @@ function sourceLabels(sources: string[]): string[] {
   return [...new Set(sources.map(label))];
 }
 
-const WAVE_MS = 1500;
-const MOUTH_PEAK = 0.8;
-const MOUTH_DECAY_MS = 120;
-
 /** Prefer an English male voice when the browser has one; otherwise any English voice; otherwise the default. */
 function pickVoice(): SpeechSynthesisVoice | undefined {
   const english = window.speechSynthesis.getVoices().filter((v) => v.lang.toLowerCase().startsWith("en"));
@@ -39,51 +30,29 @@ function pickVoice(): SpeechSynthesisVoice | undefined {
   return english.find((v) => male.test(v.name) && !female.test(v.name)) ?? english.find((v) => !female.test(v.name)) ?? english[0];
 }
 
-export default function AskAkib({ open, onClose, onAkib, soundOn, onToggleSound }: Props) {
+export default function AskAkib({ open, onClose, soundOn, onToggleSound }: Props) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [text, setText] = useState("");
-  const [focused, setFocused] = useState(false);
-  const [waving, setWaving] = useState(false);
-  const [speaking, setSpeaking] = useState(false);
-  const [mouth, setMouth] = useState<number | undefined>(undefined);
   const [canSpeak, setCanSpeak] = useState(false);
 
   const input = useRef<HTMLInputElement>(null);
   const log = useRef<HTMLDivElement>(null);
   const nextId = useRef(1);
   const utter = useRef<SpeechSynthesisUtterance | null>(null);
-  const decay = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSpoken = useRef<string | null>(null);
 
   useEffect(() => { setCanSpeak(typeof window !== "undefined" && "speechSynthesis" in window); }, []);
 
-  const stopDecay = () => { if (decay.current) { clearInterval(decay.current); decay.current = null; } };
-
-  /** Mouth opens to its peak on each word boundary and decays to shut over 120 ms. */
-  const pulse = useCallback(() => {
-    stopDecay();
-    const t0 = performance.now();
-    setMouth(MOUTH_PEAK);
-    decay.current = setInterval(() => {
-      const v = MOUTH_PEAK * (1 - (performance.now() - t0) / MOUTH_DECAY_MS);
-      if (v <= 0.02) { setMouth(0); stopDecay(); } else setMouth(v);
-    }, 40);
-  }, []);
-
   const silence = useCallback(() => {
-    stopDecay();
     utter.current = null;
     lastSpoken.current = null;
     if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
-    setSpeaking(false);
-    setMouth(undefined);
   }, []);
 
   const speak = useCallback((line: string) => {
     lastSpoken.current = line;
     if (!studioSound.enabled || typeof window === "undefined" || !("speechSynthesis" in window)) return;
     window.speechSynthesis.cancel();
-    stopDecay();
     const u = new SpeechSynthesisUtterance(line);
     const voice = pickVoice();
     if (voice) u.voice = voice;
@@ -91,13 +60,11 @@ export default function AskAkib({ open, onClose, onAkib, soundOn, onToggleSound 
     u.rate = 1;
     utter.current = u;
     const mine = () => utter.current === u;   // a cancelled utterance reports late; ignore it once a newer one exists
-    u.onstart = () => { if (mine()) { setSpeaking(true); setMouth(undefined); } };   // until a boundary arrives the character flaps on its own
-    u.onboundary = () => { if (mine()) pulse(); };
-    const done = () => { if (mine()) { utter.current = null; stopDecay(); setSpeaking(false); setMouth(0); } };
+    const done = () => { if (mine()) utter.current = null; };
     u.onend = done;
     u.onerror = done;
     window.speechSynthesis.speak(u);
-  }, [pulse]);
+  }, []);
 
   const ask = useCallback((question: string) => {
     const q = question.trim();
@@ -108,13 +75,10 @@ export default function AskAkib({ open, onClose, onAkib, soundOn, onToggleSound 
     speak(reply.answer);
   }, [speak]);
 
-  // opening: wave for 1.5 s, focus the input. closing: stop talking.
+  // opening: focus the input. closing: stop talking.
   useEffect(() => {
-    if (!open) { silence(); setWaving(false); return; }
-    setWaving(true);
-    const t = setTimeout(() => setWaving(false), WAVE_MS);
+    if (!open) { silence(); return; }
     input.current?.focus({ preventScroll: true });
-    return () => clearTimeout(t);
   }, [open, silence]);
 
   useEffect(() => {
@@ -125,11 +89,6 @@ export default function AskAkib({ open, onClose, onAkib, soundOn, onToggleSound 
   }, [open, onClose]);
 
   useEffect(() => () => silence(), [silence]);
-
-  const pose: AkibPose = speaking ? "talk" : waving ? "wave" : focused || text.length > 0 ? "listen" : "typing";
-  useEffect(() => {
-    onAkib(open ? { pose, mouth: speaking ? mouth : undefined } : null);
-  }, [open, pose, mouth, speaking, onAkib]);
 
   useEffect(() => { log.current?.scrollTo({ top: log.current.scrollHeight }); }, [turns]);
 
@@ -184,8 +143,6 @@ export default function AskAkib({ open, onClose, onAkib, soundOn, onToggleSound 
           type="text"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
           placeholder="Ask me anything about my work"
           aria-label="Your question"
           autoComplete="off"
