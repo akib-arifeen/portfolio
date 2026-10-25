@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { scene as c } from "./palette";
 
 export type AkibPose = "typing" | "wave" | "talk" | "listen" | "nod";
@@ -220,7 +221,7 @@ function noise(x: number, y: number, z: number) {
 
 /** A tapered, roughened blob with vertex colours running from dark roots to warm brown tips. */
 function clump(rx: number, ry: number, rz: number, taper: number, tipFrom = 0.6): THREE.BufferGeometry {
-  const g = new THREE.SphereGeometry(1, 8, 6);
+  const g = new THREE.SphereGeometry(1, 14, 10);
   const pos = g.attributes.position;
   const col = new Float32Array(pos.count * 3);
   for (let i = 0; i < pos.count; i++) {
@@ -282,30 +283,114 @@ function buildKit() {
   const statics = paintStatic();
 
   const flat = (color: string, extra: THREE.MeshStandardMaterialParameters = {}) =>
-    new THREE.MeshStandardMaterial({ color, roughness: 0.85, flatShading: true, ...extra });
+    new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...extra });
+
+  const dome = domeGeometry();
+  dome.rotateX(-0.2);
+  dome.translate(0, 0.05, -0.02);
+  const hairParts = [dome, ...CLUMPS.map((k) => {
+    const geometry = clump(k.r[0], k.r[1], k.r[2], k.taper, k.tipFrom);
+    geometry.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(...k.rot)).setPosition(...k.p));
+    return geometry;
+  })];
+  const hairGeometry = mergeGeometries(hairParts)!;
+  hairParts.forEach((part) => part.dispose());
+
+  const handParts: THREE.BufferGeometry[] = [];
+  const palm = new THREE.SphereGeometry(1, 16, 12);
+  palm.scale(0.064, 0.038, 0.072);
+  palm.translate(0, -0.035, 0.015);
+  handParts.push(palm);
+  [-0.042, -0.014, 0.014, 0.042].forEach((x, i) => {
+    const finger = new THREE.CapsuleGeometry(0.011, 0.038 + (i === 1 || i === 2 ? 0.012 : 0), 4, 8);
+    finger.rotateX(Math.PI / 2);
+    finger.translate(x, -0.04, 0.088 - Math.abs(x) * 0.25);
+    handParts.push(finger);
+  });
+  const thumb = new THREE.CapsuleGeometry(0.014, 0.035, 4, 8);
+  thumb.rotateZ(-0.75);
+  thumb.translate(0.066, -0.035, 0.02);
+  handParts.push(thumb);
+  const handGeometry = mergeGeometries(handParts)!;
+  handParts.forEach((part) => part.dispose());
+
+  const eyeLat = THETA_START + (EYE_Y / FACE_H) * THETA_LEN - Math.PI / 2;
+  const eyeY = -0.3 * Math.sin(eyeLat);
+  const eyeX = 0.3 * Math.sin(0.42);
+  const eyeZ = 0.3 * Math.cos(0.42) * Math.cos(eyeLat) + 0.022;
+  const glassesParts: THREE.BufferGeometry[] = [];
+  [1, -1].forEach((side) => {
+    const lens = new THREE.TorusGeometry(0.074, 0.0062, 8, 32);
+    lens.rotateY(side * 0.42);
+    lens.translate(side * eyeX, eyeY, eyeZ);
+    glassesParts.push(lens);
+    const temple = new THREE.CylinderGeometry(0.005, 0.005, 0.285, 8);
+    temple.rotateX(Math.PI / 2);
+    temple.translate(side * 0.255, eyeY, 0.14);
+    glassesParts.push(temple);
+  });
+  const bridge = new THREE.CylinderGeometry(0.005, 0.005, 0.075, 8);
+  bridge.rotateZ(Math.PI / 2);
+  bridge.translate(0, eyeY + 0.012, 0.305);
+  glassesParts.push(bridge);
+  const glassesGeometry = mergeGeometries(glassesParts)!;
+  glassesParts.forEach((part) => part.dispose());
+
+  const shoulder = new THREE.SphereGeometry(1, 20, 14);
+  shoulder.scale(0.09, 0.09, 0.09);
+  const sleeve = new THREE.CapsuleGeometry(0.075, 0.05, 6, 14);
+  sleeve.translate(0, -0.07, 0);
+  const armGeometry = mergeGeometries([shoulder, sleeve])!;
+  shoulder.dispose(); sleeve.dispose();
+
+  const headCups: THREE.BufferGeometry[] = [], headPads: THREE.BufferGeometry[] = [];
+  const neckCups: THREE.BufferGeometry[] = [], neckPads: THREE.BufferGeometry[] = [];
+  [1, -1].forEach((side) => {
+    const headMatrix = new THREE.Matrix4().makeRotationZ(Math.PI / 2).setPosition(side * 0.335, 0, -0.01);
+    headCups.push(new THREE.CylinderGeometry(0.1, 0.1, 0.07, 20).applyMatrix4(headMatrix));
+    headPads.push(new THREE.CylinderGeometry(0.085, 0.085, 0.03, 18).applyMatrix4(headMatrix.clone().multiply(new THREE.Matrix4().makeTranslation(0, -side * 0.04, 0))));
+    const neckMatrix = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(Math.PI / 2 - 0.25, 0, side * 0.2)).setPosition(side * 0.15, -0.05, 0.13);
+    neckCups.push(new THREE.CylinderGeometry(0.1, 0.1, 0.07, 20).applyMatrix4(neckMatrix));
+    neckPads.push(new THREE.CylinderGeometry(0.085, 0.085, 0.03, 18).applyMatrix4(neckMatrix.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0.045, 0))));
+  });
+  const headCupGeometry = mergeGeometries(headCups)!, headPadGeometry = mergeGeometries(headPads)!;
+  const neckCupGeometry = mergeGeometries(neckCups)!, neckPadGeometry = mergeGeometries(neckPads)!;
+  [...headCups, ...headPads, ...neckCups, ...neckPads].forEach((part) => part.dispose());
+
+  const skinParts = [new THREE.SphereGeometry(0.3, 32, 24)];
+  const nose = new THREE.SphereGeometry(0.03, 16, 12);
+  nose.scale(1, 0.9, 0.95);
+  nose.translate(0, -0.058, 0.296);
+  skinParts.push(nose);
+  [1, -1].forEach((side) => {
+    const ear = new THREE.SphereGeometry(0.05, 14, 10);
+    ear.scale(0.6, 1.1, 0.9);
+    ear.translate(side * 0.292, -0.01, -0.01);
+    skinParts.push(ear);
+  });
+  const skinGeometry = mergeGeometries(skinParts)!;
+  skinParts.forEach((part) => part.dispose());
 
   const g = {
-    skull: new THREE.SphereGeometry(0.3, 22, 16),
-    face: new THREE.SphereGeometry(0.3 * 1.006, 28, 16, Math.PI / 2 - PHI_SPAN / 2, PHI_SPAN, THETA_START, THETA_LEN),
-    ear: new THREE.SphereGeometry(0.05, 8, 6),
-    nose: new THREE.SphereGeometry(0.03, 10, 8),
-    neck: new THREE.CylinderGeometry(0.07, 0.08, 0.14, 10),
-    collar: new THREE.TorusGeometry(0.1, 0.017, 6, 18),
-    unit: new THREE.SphereGeometry(1, 14, 10),
-    sleeve: new THREE.CapsuleGeometry(0.075, 0.05, 4, 10),
-    fore: new THREE.CapsuleGeometry(0.055, 0.19, 4, 8),
-    thigh: new THREE.CapsuleGeometry(0.1, 0.14, 4, 10),
-    shin: new THREE.CapsuleGeometry(0.075, 0.2, 4, 10),
+    skin: skinGeometry,
+    face: new THREE.SphereGeometry(0.3 * 1.006, 36, 24, Math.PI / 2 - PHI_SPAN / 2, PHI_SPAN, THETA_START, THETA_LEN),
+    neck: new THREE.CylinderGeometry(0.07, 0.08, 0.14, 18),
+    collar: new THREE.TorusGeometry(0.1, 0.017, 8, 24),
+    unit: new THREE.SphereGeometry(1, 20, 14),
+    arm: armGeometry,
+    fore: new THREE.CapsuleGeometry(0.055, 0.19, 6, 12),
+    hand: handGeometry,
+    thigh: new THREE.CapsuleGeometry(0.1, 0.14, 6, 14),
+    shin: new THREE.CapsuleGeometry(0.075, 0.2, 6, 12),
     sole: new THREE.BoxGeometry(0.13, 0.03, 0.26),
-    lens: new THREE.TorusGeometry(0.074, 0.0062, 6, 26),
-    bridge: new THREE.CylinderGeometry(0.005, 0.005, 0.075, 5),
-    temple: new THREE.CylinderGeometry(0.005, 0.005, 0.285, 5),
-    band: new THREE.TorusGeometry(0.335, 0.02, 6, 22, Math.PI),
-    neckBand: new THREE.TorusGeometry(0.18, 0.018, 6, 22, Math.PI * 2 - 1.3),
-    cup: new THREE.CylinderGeometry(0.1, 0.1, 0.07, 14),
-    pad: new THREE.CylinderGeometry(0.085, 0.085, 0.03, 12),
-    dome: domeGeometry(),
-    clumps: CLUMPS.map((k) => clump(k.r[0], k.r[1], k.r[2], k.taper, k.tipFrom)),
+    glasses: glassesGeometry,
+    band: new THREE.TorusGeometry(0.335, 0.02, 8, 28, Math.PI),
+    neckBand: new THREE.TorusGeometry(0.18, 0.018, 8, 28, Math.PI * 2 - 1.3),
+    headCups: headCupGeometry,
+    headPads: headPadGeometry,
+    neckCups: neckCupGeometry,
+    neckPads: neckPadGeometry,
+    hair: hairGeometry,
   };
   const m = {
     skinS: new THREE.MeshStandardMaterial({ color: c.akibSkin, roughness: 0.8 }),
@@ -392,7 +477,7 @@ function target(pose: AkibPose, t: number, tw: number, glance: number, mot: numb
     }
     case "wave": {
       const raised = tw < 2.7 ? 1 : 0;
-      o[HIPS] = 1.15; o[SPINE] = 0.25; o[HEAD] = 0.95;
+      o[HIPS] = 0.45; o[SPINE] = 0.15; o[HEAD] = 0.65;
       o[LEAN] = 0.02; o[PITCH] = -0.02; o[ROLL] = 0.05;
       o[SMILE] = 1;
       o[MOUTH] = 0.3;
@@ -409,7 +494,7 @@ function target(pose: AkibPose, t: number, tw: number, glance: number, mot: numb
       break;
     }
     case "talk": {
-      o[HIPS] = 1.05; o[SPINE] = 0.25; o[HEAD] = 1.0;
+      o[HIPS] = 0.45; o[SPINE] = 0.15; o[HEAD] = 0.65;
       o[LEAN] = 0.06; o[PITCH] = mot * 0.04 * s(t * 2.1);
       o[SMILE] = 0.5;
       o[MOUTH] = mouthProp ?? Math.min(1, Math.abs(s(t * 9)) * Math.abs(s(t * 5.3 + 1)) * 1.3) * mot;
@@ -421,7 +506,7 @@ function target(pose: AkibPose, t: number, tw: number, glance: number, mot: numb
       break;
     }
     case "listen": {
-      o[HIPS] = 1.05; o[SPINE] = 0.25; o[HEAD] = 1.0;
+      o[HIPS] = 0.45; o[SPINE] = 0.15; o[HEAD] = 0.65;
       o[LEAN] = 0.04; o[ROLL] = 0.12; o[PITCH] = 0.03 + mot * 0.06 * s(t * 1.2);
       o[SMILE] = 0.8;
       o[MOUTH] = 0.15;
@@ -430,7 +515,7 @@ function target(pose: AkibPose, t: number, tw: number, glance: number, mot: numb
     }
     case "nod": {
       const beat = s(t * 2 * Math.PI * (100 / 60));
-      o[HIPS] = 0.75; o[SPINE] = -0.05; o[HEAD] = 0.9;
+      o[HIPS] = 0.3; o[SPINE] = -0.05; o[HEAD] = 0.75;
       o[LEAN] = 0.1; o[PITCH] = 0.08 + mot * 0.1 * beat;
       o[BOB] = mot * 0.012 * beat;
       o[SWAY] = mot * 0.05 * s(t * Math.PI * (100 / 60));
@@ -470,13 +555,14 @@ export default function Akib(props: AkibProps) {
     const p = live.current;
     const t = state.clock.elapsedTime;
     const mot = p.reducedMotion ? 0 : 1;
+    const expressive = p.pose === "wave" || p.pose === "talk" || p.pose === "nod" ? mot : 0;
     if (p.pose !== s.pose || !s.init) {
       if (p.pose === "wave") s.waveStart = t;
       s.pose = p.pose;
     }
     const tw = p.reducedMotion ? 1 : t - s.waveStart;
-    const glance = mot * Math.min(1, Math.max(0, (Math.sin(t * 0.31 + 1) - 0.8) * 8));
-    target(p.pose, mot ? t : 0, tw, glance, mot, p.mouth, goal);
+    const glance = expressive * Math.min(1, Math.max(0, (Math.sin(t * 0.31 + 1) - 0.8) * 8));
+    target(p.pose, expressive ? t : 0, tw, glance, expressive, p.mouth, goal);
 
     const step = Math.min(dt, 0.05);
     for (let i = 0; i < N; i++) {
@@ -493,7 +579,7 @@ export default function Akib(props: AkibProps) {
     const yawAdd = THREE.MathUtils.clamp(s.ptrX * 0.61, -0.61, 0.61);
     const pitchAdd = THREE.MathUtils.clamp(-s.ptrY * 0.26, -0.26, 0.26);
 
-    const breath = mot * Math.sin(t * 1.7);
+    const breath = expressive * Math.sin(t * 1.7);
     if (hips.current) {
       hips.current.rotation.y = -cur[HIPS];
       hips.current.position.y = 0.12 + cur[BOB] + breath * 0.003;
@@ -535,33 +621,24 @@ export default function Akib(props: AkibProps) {
     onHead ? (
       <group>
         <mesh geometry={g.band} material={m.phone} scale={[1, 1.4, 1.05]} rotation={[-0.15, 0, 0]} position={[0, 0, -0.01]} castShadow />
-        {[1, -1].map((sd) => (
-          <group key={sd} position={[sd * 0.335, 0, -0.01]} rotation={[0, 0, Math.PI / 2]}>
-            <mesh geometry={g.cup} material={m.phone} castShadow />
-            <mesh geometry={g.pad} material={m.pad} position={[0, -sd * 0.04, 0]} />
-          </group>
-        ))}
+        <mesh geometry={g.headCups} material={m.phone} castShadow />
+        <mesh geometry={g.headPads} material={m.pad} />
       </group>
     ) : (
       <group position={[0, 0.27, -0.02]}>
         <mesh geometry={g.neckBand} material={m.phone} rotation={[Math.PI / 2, 0, Math.PI / 2 + 0.65]} castShadow />
-        {[1, -1].map((sd) => (
-          <group key={sd} position={[sd * 0.15, -0.05, 0.13]} rotation={[Math.PI / 2 - 0.25, 0, sd * 0.2]}>
-            <mesh geometry={g.cup} material={m.phone} castShadow />
-            <mesh geometry={g.pad} material={m.pad} position={[0, 0.045, 0]} />
-          </group>
-        ))}
+        <mesh geometry={g.neckCups} material={m.phone} castShadow />
+        <mesh geometry={g.neckPads} material={m.pad} />
       </group>
     );
 
   const arm = (side: 1 | -1, sh: React.RefObject<Joint>, el: React.RefObject<Joint>, hand: React.RefObject<Joint>) => (
     <group ref={sh} position={[side * 0.27, 0.2, 0]}>
-      <mesh geometry={g.unit} material={m.tee} scale={0.09} castShadow />
-      <mesh geometry={g.sleeve} material={m.tee} position={[0, -0.07, 0]} castShadow />
+      <mesh geometry={g.arm} material={m.tee} castShadow />
       <group ref={el} position={[0, -0.26, 0]}>
         <mesh geometry={g.fore} material={m.skinF} position={[0, -0.06, 0]} castShadow />
         <group ref={hand} position={[0, -0.22, 0]}>
-          <mesh geometry={g.unit} material={m.skinF} position={[0, -0.04, 0]} scale={[0.06, 0.075, 0.045]} castShadow />
+          <mesh geometry={g.hand} material={m.skinF} castShadow />
         </group>
       </group>
     </group>
@@ -580,14 +657,9 @@ export default function Akib(props: AkibProps) {
     </group>
   );
 
-  const eyeLat = THETA_START + (EYE_Y / FACE_H) * THETA_LEN - Math.PI / 2; // painted eye height, as latitude below the equator
-  const eyeY = -0.3 * Math.sin(eyeLat);
-  const eyeX = 0.3 * Math.sin(0.42);
-  const eyeZ = 0.3 * Math.cos(0.42) * Math.cos(eyeLat) + 0.022;
-
   return (
     <group position={[-0.45, 0.7, -2.5]} rotation={[0, 1.62, 0]} dispose={null}>
-      <group scale={0.9}>
+      <group scale={0.98}>
         <group ref={hips} position={[0, 0.12, 0]}>
           <mesh geometry={g.unit} material={m.pants} scale={[0.25, 0.14, 0.2]} castShadow />
           {leg(1, lKnee)}
@@ -603,29 +675,12 @@ export default function Akib(props: AkibProps) {
                 <mesh geometry={g.neck} material={m.skinF} position={[0, 0.03, 0]} castShadow />
                 <mesh geometry={g.collar} material={m.trim} rotation={[Math.PI / 2, 0, 0]} position={[0, -0.01, 0.005]} scale={[1, 1.05, 1]} />
                 <group ref={head} position={[0, 0.1, 0]}>
-                  <group position={[0, 0.32, 0]} scale={1.22}>
-                    <mesh geometry={g.skull} material={m.skinS} castShadow />
+                  <group position={[0, 0.32, 0]} scale={1.1}>
+                    <mesh geometry={g.skin} material={m.skinS} castShadow />
                     <mesh geometry={g.face} material={m.face} />
-                    {[1, -1].map((sd) => (
-                      <mesh key={sd} geometry={g.ear} material={m.skinF} position={[sd * 0.292, -0.01, -0.01]} scale={[0.6, 1.1, 0.9]} castShadow />
-                    ))}
-                    <mesh geometry={g.nose} material={m.skinS} position={[0, -0.058, 0.296]} scale={[1, 0.9, 0.95]} />
 
-                    {/* thin round glasses */}
-                    {[1, -1].map((sd) => (
-                      <group key={sd}>
-                        <mesh geometry={g.lens} material={m.silver} position={[sd * eyeX, eyeY, eyeZ]} rotation={[0, sd * 0.42, 0]} />
-                        <mesh geometry={g.temple} material={m.silver} position={[sd * 0.255, eyeY, 0.14]} rotation={[Math.PI / 2, 0, 0]}
-                          scale={[1, 1, 1]} />
-                      </group>
-                    ))}
-                    <mesh geometry={g.bridge} material={m.silver} position={[0, eyeY + 0.012, 0.305]} rotation={[0, 0, Math.PI / 2]} />
-
-                    {/* hair */}
-                    <mesh geometry={g.dome} material={m.hair} position={[0, 0.05, -0.02]} rotation={[-0.2, 0, 0]} castShadow />
-                    {CLUMPS.map((k, i) => (
-                      <mesh key={i} geometry={g.clumps[i]} material={m.hair} position={k.p} rotation={k.rot} castShadow />
-                    ))}
+                    <mesh geometry={g.glasses} material={m.silver} />
+                    <mesh geometry={g.hair} material={m.hair} castShadow />
                     {headphonesOn && headphones(true)}
                   </group>
                 </group>

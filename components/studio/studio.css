@@ -8,6 +8,10 @@
   overflow: hidden;
   background: var(--color-paper-2);
 }
+.studio-fallback picture {
+  position: absolute;
+  inset: 0;
+}
 .studio-fallback__room {
   width: 100%;
   height: 100%;

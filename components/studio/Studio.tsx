@@ -1,10 +1,10 @@
 "use client";
 
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { Html, OrbitControls, OrthographicCamera, PerformanceMonitor } from "@react-three/drei";
+import { Html, Instance, Instances, OrbitControls, PerformanceMonitor, PerspectiveCamera } from "@react-three/drei";
 import { Component, memo, useCallback, useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from "react";
 import * as THREE from "three";
-import { Box, Cyl, Room } from "./Room";
+import { Bevel, Box, Cyl, Room } from "./Room";
 import Akib, { type AkibPose } from "./Akib";
 import StudioFallback from "./StudioFallback";
 import { lights, scene as c, type Phase } from "./palette";
@@ -20,7 +20,7 @@ const CLICK_SLOP = 4;
 
 /** Where the camera looks when a spot is selected. */
 export const spotFocus: Record<StudioSpot, V3> = {
-  video: [-0.55, 2.2, -3.0],
+  video: [-1.72, 1.95, -3.06],
   booth: [BOOTH_POS.x, 1.05, BOOTH_POS.z],
   lessons: [1.35, 2.15, -2.85],
   zoom: [1.95, 2.15, -2.85],
@@ -111,8 +111,9 @@ function Studio(props: StudioProps) {
       <Canvas
         shadows="percentage" /* PCFShadowMap: three r186 removed PCFSoftShadowMap, and R3F's boolean `shadows` still asks for it */
         dpr={dpr}
-        frameloop={running ? "always" : "never"}
-        gl={{ antialias: true, alpha: true }}
+        frameloop={running ? (props.reducedMotion ? "demand" : "always") : "never"}
+        gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+        onCreated={({ gl }) => { gl.toneMappingExposure = 1.08; }}
         style={{ touchAction: props.explore ? "none" : "pan-y" }}
         onPointerMissed={() => props.onSelect(null)}
         role="group"
@@ -130,10 +131,9 @@ export default memo(Studio);
 
 function Scene({ phase, selected, onSelect, onCycleLight, onHover, reducedMotion, explore, akibPose, akibMouth, active }: Omit<StudioProps, "paused"> & { active: boolean }) {
   const [hovered, setHovered] = useState<StudioSpot | "window" | null>(null);
-  const ortho = useRef<THREE.OrthographicCamera>(null);
+  const perspective = useRef<THREE.PerspectiveCamera>(null);
   const orbit = useRef<OrbitHandle>(null);
-  // one stable array: a fresh one each render would make R3F re-aim the pivot mid-orbit
-  const orbitTarget = useMemo(() => WORKSTATION.toArray(), []);
+  const orbitTarget = useMemo(() => HOME_TARGET.toArray(), []);
   const light = lights[phase];
 
   const spot = (id: StudioSpot, label: V3, children: ReactNode) => (
@@ -145,8 +145,8 @@ function Scene({ phase, selected, onSelect, onCycleLight, onHover, reducedMotion
 
   return (
     <>
-      <OrthographicCamera ref={ortho} makeDefault position={[12, 10, 12]} zoom={60} near={0.1} far={200} />
-      <CameraRig cam={ortho} controls={orbit} selected={selected} reducedMotion={reducedMotion} explore={explore} />
+      <PerspectiveCamera ref={perspective} makeDefault position={[2.4, 2.5, 2.3]} fov={32} near={0.1} far={60} />
+      <CameraRig cam={perspective} controls={orbit} selected={selected} reducedMotion={reducedMotion} explore={explore} />
       <OrbitControls
         ref={orbit}
         enabled={explore}
@@ -156,19 +156,18 @@ function Scene({ phase, selected, onSelect, onCycleLight, onHover, reducedMotion
         enableDamping={!reducedMotion}
         dampingFactor={0.08}
         rotateSpeed={0.55}
-        minAzimuthAngle={0.45}
-        maxAzimuthAngle={1.15}
+        minAzimuthAngle={0.35}
+        maxAzimuthAngle={1.05}
         minPolarAngle={0.82}
-        maxPolarAngle={1.22}
+        maxPolarAngle={1.35}
       />
       <TouchScroll explore={explore} />
       <Lights phase={phase} reducedMotion={reducedMotion} />
-      {/* bare walls and floor are the way back out of a selection: props stop the click before it reaches here */}
+      <RenderMetrics active={active} />
       <group onClick={(e) => { if (e.delta > CLICK_SLOP) return; e.stopPropagation(); onSelect(null); }}>
         <Room sky={light.sky} />
       </group>
 
-      {/* window hotspot: click to change the light */}
       <mesh
         position={[-3.0, 2.15, 0.9]}
         rotation={[0, Math.PI / 2, 0]}
@@ -185,22 +184,21 @@ function Scene({ phase, selected, onSelect, onCycleLight, onHover, reducedMotion
         )}
       </mesh>
 
-      {spot("video", [0, 0.75, 0], <Monitor phase={phase} playing={active && !reducedMotion} />)}
+      {spot("video", [0, 0.55, 0], <Monitor phase={phase} playing={active && !reducedMotion && selected === "video"} />)}
       {spot("laptop", [0, 0.45, 0.2], <Laptop />)}
       <Lamp phase={phase} />
       {spot("mic", [0, 0.75, 0], <Mic />)}
       {spot("me", [0, 1.25, 0], <Akib reducedMotion={reducedMotion} pose={akibPose ?? (selected === "me" ? "wave" : "typing")} mouth={akibMouth} lookAtPointer headphonesOn={false} />)}
 
-      {/* shelf on the back wall */}
-      <Box size={[2.1, 0.07, 0.45]} position={[1.95, 2.0, -2.88]} color={c.desk} />
-      <Box size={[2.1, 0.07, 0.45]} position={[1.95, 1.3, -2.88]} color={c.desk} />
+      <Bevel size={[2.1, 0.065, 0.45]} position={[1.95, 2.0, -2.88]} color={c.desk} />
+      <Bevel size={[2.1, 0.065, 0.45]} position={[1.95, 1.3, -2.88]} color={c.desk} />
       {spot("lessons", [0, 0.6, 0], <Books />)}
       {spot("zoom", [0, 0.6, 0], <Reel />)}
       {spot("workout", [0, 0.45, 0], <Dumbbell />)}
       {spot("culinary", [0, 0.4, 0], <Pan />)}
       <Cyl r={0.09} h={0.18} position={[2.45, 1.43, -2.85]} color={c.cream} />
 
-      {spot("booth", [0, 0.75, 0], <Booth phase={phase} />)}
+      {spot("booth", [0, 0.65, 0], <Booth phase={phase} />)}
     </>
   );
 }
@@ -233,66 +231,83 @@ function Spot({ id, label, hovered, selected, onHover, onSelect, reducedMotion, 
   );
 }
 
-/* ── Camera: isometric, glides to what you pick, leans with the pointer ── */
+/* ── Camera: a close perspective lens with a separate phone composition ── */
 
-/** A slightly lower lens than a full isometric: the visitor looks across the desk at the person, not down on the room. */
 const ISO_DIR = new THREE.Vector3(1, 0.66, 1).normalize();
 const RIGHT = new THREE.Vector3(1, 0, -1).normalize();
 const UP = new THREE.Vector3().crossVectors(RIGHT, ISO_DIR).multiplyScalar(-1).normalize();
-/** The person and the laptop are what the card centres on; the window stays at the edge so the light has a source. */
 const WORKSTATION = new THREE.Vector3(-0.75, 1.6, -1.65);
+const HOME_TARGET = new THREE.Vector3(-0.25, 1.38, -2.25);
+const DESKTOP_CAMERA = new THREE.Vector3(1.65, 2.2, 1.15);
+const PHONE_TARGET = new THREE.Vector3(-0.22, 1.4, -2.35);
+const PHONE_CAMERA = new THREE.Vector3(1.45, 2.12, 0.55);
 
-function CameraRig({ cam: camRef, controls: controlsRef, selected, reducedMotion, explore }: { cam: React.RefObject<THREE.OrthographicCamera | null>; controls: React.RefObject<OrbitHandle | null>; selected: StudioSpot | null; reducedMotion: boolean; explore: boolean }) {
+function CameraRig({ cam: camRef, controls: controlsRef, selected, reducedMotion, explore }: { cam: React.RefObject<THREE.PerspectiveCamera | null>; controls: React.RefObject<OrbitHandle | null>; selected: StudioSpot | null; reducedMotion: boolean; explore: boolean }) {
   const { size } = useThree();
-  const target = useRef(WORKSTATION.clone());
+  const target = useRef(HOME_TARGET.clone());
   const goal = useMemo(() => new THREE.Vector3(), []);
-  const tmp = useMemo(() => new THREE.Vector3(), []);
-  const recovering = useRef(false);
+  const position = useMemo(() => new THREE.Vector3(), []);
   const wasExplore = useRef(explore);
 
   useFrame((state, dt) => {
     const cam = camRef.current;
     if (!cam) return;
-    // handover: the orbit pivot follows this rig every frame, so explore on or off never re-aims the camera
     controlsRef.current?.target.copy(target.current);
-    if (wasExplore.current !== explore) { recovering.current = !explore; wasExplore.current = explore; }
-    // while the visitor is dragging, OrbitControls owns the camera
+    if (wasExplore.current !== explore) wasExplore.current = explore;
     if (explore) return;
 
-    // person-first: a close, low frame on the face and hands. The phone crops the empty right side
-    // of the room rather than shrinking the workstation to fit it.
     const phone = size.width < 600;
-    const baseZoom = Math.min(size.width / (phone ? 5.9 : 6.0), size.height / (phone ? 4.8 : 3.4));
-    let zoom = baseZoom;
+    if (selected) goal.set(...spotFocus[selected]);
+    else goal.copy(phone ? PHONE_TARGET : HOME_TARGET);
 
     if (selected === "laptop") {
-      zoom = baseZoom * 3.4; // dive toward the screen; the laptop layer crossfades in on top
-      goal.set(...spotFocus.laptop);
+      position.copy(goal).add(new THREE.Vector3(1.05, 0.82, 1.5));
     } else if (selected) {
-      zoom = baseZoom * 1.5;
-      goal.set(...spotFocus[selected]);
+      position.copy(goal).addScaledVector(ISO_DIR, selected === "booth" ? 4.1 : 3.7);
     } else {
-      goal.copy(WORKSTATION);
+      position.copy(phone ? PHONE_CAMERA : DESKTOP_CAMERA);
+      if (!reducedMotion) position.addScaledVector(RIGHT, state.pointer.x * 0.12).addScaledVector(UP, state.pointer.y * 0.08);
     }
 
     const k = reducedMotion ? 1 : 1 - Math.exp(-dt * 4.5);
     target.current.lerp(goal, k);
-    cam.zoom += (zoom - cam.zoom) * k;
-
-    tmp.copy(target.current).addScaledVector(ISO_DIR, 24);
-    if (!reducedMotion) {
-      tmp.addScaledVector(RIGHT, state.pointer.x * 0.5).addScaledVector(UP, state.pointer.y * 0.35);
-    }
-    if (recovering.current) {
-      // back from an orbit: glide home, then hand the camera straight back to the exact path above
-      cam.position.lerp(tmp, k);
-      if (cam.position.distanceToSquared(tmp) < 1e-5) { cam.position.copy(tmp); recovering.current = false; }
-    } else {
-      cam.position.copy(tmp);
-    }
+    cam.position.lerp(position, k);
+    const fov = phone ? 34 : 32;
+    if (cam.fov !== fov) { cam.fov = fov; cam.updateProjectionMatrix(); }
     cam.lookAt(target.current);
-    cam.updateProjectionMatrix();
   });
+  return null;
+}
+
+function RenderMetrics({ active }: { active: boolean }) {
+  const { gl, scene, size } = useThree();
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production" || !active) return;
+    const timer = window.setTimeout(() => {
+      const textures = new Set<THREE.Texture>();
+      scene.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) return;
+        const list = Array.isArray(object.material) ? object.material : [object.material];
+        list.forEach((material) => {
+          Object.values(material).forEach((value) => { if (value instanceof THREE.Texture) textures.add(value); });
+        });
+      });
+      let bytes = 4 * 1024 * 1024;
+      textures.forEach((texture) => {
+        const image = texture.image as { width?: number; height?: number } | undefined;
+        bytes += (image?.width ?? 0) * (image?.height ?? 0) * 4 * (texture.generateMipmaps ? 4 / 3 : 1);
+      });
+      console.warn("[studio:metrics]", JSON.stringify({
+        viewport: `${size.width}x${size.height}`,
+        drawCalls: gl.info.render.calls,
+        triangles: gl.info.render.triangles,
+        geometries: gl.info.memory.geometries,
+        textures: gl.info.memory.textures,
+        estimatedTextureMB: Number((bytes / 1024 / 1024).toFixed(1)),
+      }));
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [active, gl, scene, size.height, size.width]);
   return null;
 }
 
@@ -317,8 +332,8 @@ function Lights({ phase, reducedMotion }: { phase: Phase; reducedMotion: boolean
       sun.current.intensity += (L.sunIntensity * entrance - sun.current.intensity) * k;
       sun.current.color.lerp(colour.set(L.sun), k);
     }
-    if (fill.current) fill.current.intensity += (0.55 * entrance - fill.current.intensity) * k;
-    if (spill.current) spill.current.intensity += (2.0 * entrance - spill.current.intensity) * k;
+    if (fill.current) fill.current.intensity += (0.72 * entrance - fill.current.intensity) * k;
+    if (spill.current) spill.current.intensity += (1.65 * entrance - spill.current.intensity) * k;
     if (amb.current) amb.current.intensity += (L.ambient * entrance - amb.current.intensity) * k;
     if (hemi.current) {
       hemi.current.color.lerp(colour.set(L.hemiSky), k);
@@ -330,16 +345,15 @@ function Lights({ phase, reducedMotion }: { phase: Phase; reducedMotion: boolean
   return (
     <>
       <ambientLight ref={amb} intensity={0.2} />
-      {/* soft fill from the visitor's side so the booth's front panel isn't lost in shadow */}
       {/* ds-allow-hardcode:start WebGL lights and CanvasTexture paint: CSS custom properties cannot reach a three.js light or a canvas texture, so these colours mirror tokens.css and palette.ts by hand. */}
-      <directionalLight ref={fill} position={[10, 6, 10]} intensity={0.1} color="#fff1e0" />
+      <directionalLight ref={fill} position={[-4, 4, 2]} intensity={0.1} color="#bfdcf2" />
       {/* the warm task light sits in front of the person, so a short throw from the visitor's side is what separates
           his head and hands from the back wall; 3 m of reach stops it before the booth */}
       <pointLight ref={spill} position={[-0.15, 2.3, -1.25]} intensity={0} color="#ffd2a1" distance={3} decay={2} />
       <hemisphereLight ref={hemi} intensity={0.2} />
       <directionalLight
         ref={sun}
-        position={[-8, 7.5, 3]}
+        position={[3.5, 6, 4]}
         intensity={0.4}
         castShadow
         shadow-mapSize={[1024, 1024]}
@@ -355,10 +369,10 @@ function Lights({ phase, reducedMotion }: { phase: Phase; reducedMotion: boolean
 
 /* ── Props ───────────────────────────────────────────────────────── */
 
-/** The monitor's picture: the looping clip while the studio is on screen, the still frame when paused, reduced-motion or before the clip starts. */
+/** A real project still at rest; only an explicit monitor selection downloads and plays the clip. */
 function useMonitorTexture(playing: boolean) {
   const poster = useMemo(() => {
-    const t = new THREE.TextureLoader().load("/studio/monitor-loop.jpg");
+    const t = new THREE.TextureLoader().load("/work/video-studio/water-cycle.jpg");
     t.colorSpace = THREE.SRGBColorSpace;
     return t;
   }, []);
@@ -370,8 +384,8 @@ function useMonitorTexture(playing: boolean) {
     if (!clip.current) {
       const el = document.createElement("video");
       el.muted = true; el.loop = true; el.playsInline = true;
-      el.setAttribute("muted", ""); el.setAttribute("playsinline", ""); // Safari reads the attributes, not the properties
-      el.preload = "auto";
+      el.setAttribute("muted", ""); el.setAttribute("playsinline", "");
+      el.preload = "none";
       el.src = "/studio/monitor-loop.mp4";
       const tex = new THREE.VideoTexture(el);
       tex.colorSpace = THREE.SRGBColorSpace;
@@ -381,7 +395,7 @@ function useMonitorTexture(playing: boolean) {
     let gone = false;
     const onPlaying = () => { if (!gone) setLive(tex); };
     el.addEventListener("playing", onPlaying);
-    el.play().catch(() => {}); // autoplay refused: the still frame simply stays
+    el.play().catch(() => {});
     return () => { gone = true; el.removeEventListener("playing", onPlaying); };
   }, [playing]);
 
@@ -396,13 +410,12 @@ function useMonitorTexture(playing: boolean) {
 
 function Monitor({ phase, playing }: { phase: Phase; playing: boolean }) {
   const tex = useMonitorTexture(playing);
-  // the screen is its own light: it brightens a little as the room darkens, but stays a step behind the laptop
-  const tint = useMemo(() => new THREE.Color().setScalar(Math.min(0.86, 0.62 + 0.16 * lights[phase].screenGlow)), [phase]);
+  const tint = useMemo(() => new THREE.Color().setScalar(playing ? 0.82 : Math.min(0.62, 0.43 + 0.1 * lights[phase].screenGlow)), [phase, playing]);
   return (
-    <group position={[-0.55, 2.35, -3.06]}>
-      <Box size={[1.72, 1.02, 0.08]} position={[0, 0, 0]} color={c.screenFrame} cast />
+    <group position={[-1.72, 1.95, -3.06]} scale={0.74} rotation={[0, 0.04, 0]}>
+      <Bevel size={[1.72, 1.02, 0.08]} position={[0, 0, 0]} color={c.screenFrame} cast />
       <mesh position={[0, 0.02, 0.045]}>
-        <planeGeometry args={[1.53, 0.86]} /> {/* 16:9, the clip's ratio */}
+        <planeGeometry args={[1.53, 0.86]} />
         <meshBasicMaterial map={tex} color={tint} toneMapped={false} />
       </mesh>
     </group>
@@ -412,7 +425,7 @@ function Monitor({ phase, playing }: { phase: Phase; playing: boolean }) {
 /** The laptop shows a real screen from the video-studio project. If it cannot load, the screen stays dark — no invented desktop. */
 function useLaptopScreenTexture() {
   const tex = useMemo(() => {
-    const t = new THREE.TextureLoader().load("/work/video-studio/create-screen.png");
+    const t = new THREE.TextureLoader().load("/work/video-studio/cinematic-contact.jpg");
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 4;
     return t;
@@ -488,32 +501,28 @@ function Laptop() {
   const deck = useLaptopDeckTexture();
   return (
     <group position={LAPTOP_POS} rotation={[0, -Math.PI / 2 + 0.55, 0]} scale={LAPTOP_SCALE}>
-      {/* base: a milled slab with a painted keyboard deck on top */}
-      <Box size={[0.64, 0.03, 0.44]} position={[0, 0, 0]} color={c.laptop} />
+      <Bevel size={[0.64, 0.03, 0.44]} position={[0, 0, 0]} color={c.laptop} cast />
       <mesh position={[0, 0.0162, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[0.62, 0.42]} />
-        <meshStandardMaterial map={deck} roughness={0.62} metalness={0.05} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
+        <meshStandardMaterial map={deck} roughness={0.48} metalness={0.16} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
       </mesh>
-      {/* front lip and side ports */}
       <Box size={[0.64, 0.006, 0.012]} position={[0, -0.004, 0.219]} color={c.laptopEdge} />
-      {[-0.06, -0.13].map((z) => (
-        <Box key={z} size={[0.008, 0.009, 0.042]} position={[0.322, 0.002, z]} color={c.laptopPort} />
-      ))}
-      {/* hinge */}
-      <Cyl r={0.013} h={0.575} position={[0, 0.021, -0.222]} rotation={[0, 0, Math.PI / 2]} color={c.laptopPort} segments={14} />
-      {/* lid */}
+      <Instances limit={2}>
+        <boxGeometry args={[0.008, 0.009, 0.042]} />
+        <meshStandardMaterial color={c.laptopPort} roughness={0.62} />
+        {[-0.06, -0.13].map((z) => <Instance key={z} position={[0.322, 0.002, z]} />)}
+      </Instances>
+      <Cyl r={0.013} h={0.575} position={[0, 0.021, -0.222]} rotation={[0, 0, Math.PI / 2]} color={c.laptopPort} segments={18} />
       <group position={[0, 0.2, -0.24]} rotation={[-0.28, 0, 0]}>
-        <Box size={[0.64, 0.42, 0.02]} position={[0, 0, 0]} color={c.laptop} />
+        <Bevel size={[0.64, 0.42, 0.02]} position={[0, 0, 0]} color={c.laptop} cast />
         <mesh position={[0, 0.005, 0.0105]}>
           <planeGeometry args={[0.575, 0.36]} />
-          <meshBasicMaterial map={screen} toneMapped={false} />
+          <meshBasicMaterial map={screen} color="#c8c2ba" toneMapped={false} />
         </mesh>
-        {/* camera pinhole */}
         <mesh position={[0, 0.197, 0.0112]}>
           <circleGeometry args={[0.0038, 10]} />
           <meshBasicMaterial color="#2a2724" />
         </mesh>
-        {/* screen spill on the keys and his hands */}
         <pointLight position={[0, -0.03, 0.3]} color="#ffd7ad" intensity={0.12} distance={1} decay={2} />
       </group>
     </group>
@@ -527,15 +536,15 @@ function Lamp({ phase }: { phase: Phase }) {
     const target = lights[phase].lamp;
     const k = 1 - Math.exp(-dt * 2);
     if (bulb.current) bulb.current.intensity += (target - bulb.current.intensity) * k;
-    if (glow.current) glow.current.emissiveIntensity += ((target > 0 ? 2.2 : 0.05) - glow.current.emissiveIntensity) * k;
+    if (glow.current) glow.current.emissiveIntensity += ((target > 0 ? 1.15 : 0.05) - glow.current.emissiveIntensity) * k;
   });
   return (
     <group position={[0.55, 1.05, -2.8]}>
       <Cyl r={0.13} h={0.04} position={[0, 0.02, 0]} color={c.metal} />
       <Box size={[0.03, 0.6, 0.03]} position={[0, 0.32, 0]} color={c.metal} rotation={[0.25, 0, 0]} />
       <mesh position={[0, 0.66, 0.12]} rotation={[0.5, 0, 0]} castShadow>
-        <cylinderGeometry args={[0.07, 0.2, 0.22, 18, 1, true]} />
-        <meshStandardMaterial color={c.shade} side={THREE.DoubleSide} flatShading />
+        <cylinderGeometry args={[0.07, 0.2, 0.22, 32, 1, true]} />
+        <meshStandardMaterial color={c.shade} side={THREE.DoubleSide} roughness={0.62} />
       </mesh>
       <mesh position={[0, 0.6, 0.16]}>
         <sphereGeometry args={[0.05, 12, 12]} />
@@ -555,7 +564,7 @@ function Mic() {
         <Cyl r={0.015} h={0.4} position={[0, 0.22, 0]} color={c.metal} segments={6} />
         <mesh position={[0, 0.48, 0]} castShadow>
           <capsuleGeometry args={[0.07, 0.12, 6, 12]} />
-          <meshStandardMaterial color="#56534f" roughness={0.6} flatShading />
+          <meshStandardMaterial color="#56534f" roughness={0.48} metalness={0.18} />
         </mesh>
       </group>
       {/* small mixer */}

@@ -1,24 +1,26 @@
 "use client";
 
+import { Instance, Instances } from "@react-three/drei";
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { scene as c } from "./palette";
 
 type V3 = [number, number, number];
 
-/** One material per look, shared by every Box and Cyl: ~70 meshes, a handful of materials. Never disposed on purpose, they are tiny and live as long as the page. */
 const materials = new Map<string, THREE.MeshStandardMaterial>();
+const bevelGeometry = new RoundedBoxGeometry(1, 1, 1, 2, 0.055);
+
 export function sharedMaterial(color: string, emissive = "#000000", emissiveIntensity = 0) {
   const key = `${color}|${emissive}|${emissiveIntensity}`;
   let m = materials.get(key);
   if (!m) {
-    m = new THREE.MeshStandardMaterial({ color, roughness: 0.85, flatShading: true, emissive, emissiveIntensity });
+    m = new THREE.MeshStandardMaterial({ color, roughness: 0.78, emissive, emissiveIntensity });
     materials.set(key, m);
   }
   return m;
 }
 
-/** A flat-shaded box, the block-out's only building material besides cylinders. Casts no shadow unless asked: only big props and the booth should. */
 export function Box({ size, position, color, rotation, cast = false, receive = true, emissive, emissiveIntensity }: {
   size: V3; position: V3; color: string; rotation?: V3; cast?: boolean; receive?: boolean;
   emissive?: string; emissiveIntensity?: number;
@@ -30,7 +32,13 @@ export function Box({ size, position, color, rotation, cast = false, receive = t
   );
 }
 
-export function Cyl({ r, h, position, color, segments = 18, rTop, rotation, cast = false }: {
+export function Bevel({ size, position, color, rotation, cast = false, receive = true }: {
+  size: V3; position: V3; color: string; rotation?: V3; cast?: boolean; receive?: boolean;
+}) {
+  return <mesh geometry={bevelGeometry} position={position} rotation={rotation} scale={size} castShadow={cast} receiveShadow={receive} material={sharedMaterial(color)} />;
+}
+
+export function Cyl({ r, h, position, color, segments = 24, rTop, rotation, cast = false }: {
   r: number; h: number; position: V3; color: string; segments?: number; rTop?: number; rotation?: V3; cast?: boolean;
 }) {
   return (
@@ -40,95 +48,154 @@ export function Cyl({ r, h, position, color, segments = 18, rTop, rotation, cast
   );
 }
 
-/** Floorboards as a single striped texture — reads as wood without a texture file. */
-function useFloorTexture() {
-  const tex = useMemo(() => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 256;
-    canvas.height = 256;
-    const g = canvas.getContext("2d")!;
-    g.fillStyle = c.floor;
-    g.fillRect(0, 0, 256, 256);
-    for (let i = 0; i < 8; i++) {
-      g.fillStyle = i % 2 ? "rgba(20,14,8,0.16)" : "rgba(255,220,180,0.035)";
-      g.fillRect(0, i * 32, 256, 32);
-      g.fillStyle = "rgba(12,9,6,0.34)";
-      g.fillRect(0, i * 32, 256, 1.5);
-      // a few grain lines per board so the dark floor keeps some texture
-      g.fillStyle = "rgba(255,220,180,0.025)";
-      for (let j = 0; j < 3; j++) g.fillRect((i * 53 + j * 71) % 256, i * 32 + 8 + j * 7, 40, 1);
+function random(seed: number) {
+  let value = seed;
+  return () => {
+    value = (value * 1664525 + 1013904223) >>> 0;
+    return value / 4294967296;
+  };
+}
+
+function surfaceTexture(kind: "wood" | "floor" | "plaster" | "weave") {
+  const canvas = document.createElement("canvas");
+  canvas.width = kind === "wood" ? 512 : 256;
+  canvas.height = 256;
+  const g = canvas.getContext("2d")!;
+  const rand = random(kind.length * 971);
+  const w = canvas.width, h = canvas.height;
+  g.fillStyle = kind === "wood" || kind === "floor" ? "#b49a7f" : kind === "weave" ? "#b0a294" : "#c7c1b9";
+  g.fillRect(0, 0, w, h);
+
+  if (kind === "wood" || kind === "floor") {
+    for (let i = 0; i < 150; i++) {
+      const y = rand() * h;
+      g.strokeStyle = `rgba(${rand() > 0.45 ? "52,30,17" : "245,218,183"},${0.025 + rand() * 0.1})`;
+      g.lineWidth = 0.4 + rand() * 1.2;
+      g.beginPath();
+      g.moveTo(-10, y);
+      for (let x = 0; x <= w + 20; x += 32) g.lineTo(x, y + Math.sin(x * 0.022 + i) * (1 + rand() * 2));
+      g.stroke();
     }
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(1.5, 1.5);
-    return tex;
-  }, []);
-  useEffect(() => () => tex.dispose(), [tex]); // a texture nobody frees stays on the GPU for good
-  return tex;
+    if (kind === "floor") {
+      for (let y = 0; y < h; y += 42) {
+        g.fillStyle = "rgba(28,17,12,0.38)";
+        g.fillRect(0, y, w, 1.5);
+        const offset = (y / 42) % 2 ? 96 : 0;
+        for (let x = offset; x < w; x += 192) g.fillRect(x, y, 1, 42);
+      }
+    }
+  } else if (kind === "weave") {
+    for (let i = 0; i < w; i += 3) {
+      g.fillStyle = i % 6 ? "rgba(255,244,224,0.09)" : "rgba(35,25,22,0.12)";
+      g.fillRect(i, 0, 1, h);
+    }
+    for (let i = 0; i < h; i += 3) {
+      g.fillStyle = i % 6 ? "rgba(255,244,224,0.055)" : "rgba(35,25,22,0.08)";
+      g.fillRect(0, i, w, 1);
+    }
+  } else {
+    for (let i = 0; i < 10500; i++) {
+      const light = rand() > 0.48;
+      g.fillStyle = light ? `rgba(255,250,240,${rand() * 0.09})` : `rgba(45,37,33,${rand() * 0.065})`;
+      const s = 0.4 + rand() * 1.3;
+      g.fillRect(rand() * w, rand() * h, s, s);
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.anisotropy = 4;
+  return texture;
+}
+
+function useSurfaceTextures() {
+  const textures = useMemo(() => ({
+    wood: surfaceTexture("wood"),
+    floor: surfaceTexture("floor"),
+    plaster: surfaceTexture("plaster"),
+    weave: surfaceTexture("weave"),
+  }), []);
+  useEffect(() => () => Object.values(textures).forEach((texture) => texture.dispose()), [textures]);
+  return textures;
 }
 
 export function Room({ sky }: { sky: string }) {
-  const floorTex = useFloorTexture();
+  const tex = useSurfaceTextures();
+  const walls = useMemo(() => [
+    new THREE.MeshStandardMaterial({ color: c.wall, map: tex.plaster, roughness: 0.96 }),
+    new THREE.MeshStandardMaterial({ color: c.wallSide, map: tex.plaster, roughness: 0.98 }),
+  ], [tex.plaster]);
+  const wood = useMemo(() => new THREE.MeshStandardMaterial({ color: c.desk, map: tex.wood, roughness: 0.58 }), [tex.wood]);
+  const rug = useMemo(() => new THREE.MeshStandardMaterial({ color: c.rug, map: tex.weave, roughness: 1 }), [tex.weave]);
+  useEffect(() => () => { walls.forEach((m) => m.dispose()); wood.dispose(); rug.dispose(); }, [walls, wood, rug]);
+  tex.floor.repeat.set(2.8, 2.8);
+  tex.weave.repeat.set(3, 3);
+
   return (
     <group>
-      {/* plinth — the room sits on the page like a diorama */}
-      <Box size={[6.6, 0.6, 6.6]} position={[0, -0.32, 0]} color={c.base} cast={false} />
-      <Box size={[6.62, 0.08, 6.62]} position={[0, -0.6, 0]} color={c.baseEdge} cast={false} />
-
-      {/* floor */}
-      <mesh position={[0, 0.0, 0]} receiveShadow>
-        <boxGeometry args={[6.2, 0.06, 6.2]} />
-        <meshStandardMaterial map={floorTex} roughness={0.9} />
+      <mesh position={[0, -0.09, 0]} receiveShadow>
+        <boxGeometry args={[6.2, 0.2, 6.2]} />
+        <meshStandardMaterial color={c.floor} map={tex.floor} roughness={0.76} />
       </mesh>
 
-      {/* walls: back (−z) and left (−x); the open sides face the visitor */}
-      <Box size={[6.2, 3.8, 0.2]} position={[0, 1.9, -3.2]} color={c.wall} cast={false} />
-      <Box size={[0.2, 3.8, 6.4]} position={[-3.2, 1.9, -0.1]} color={c.wallSide} cast={false} />
-      <Box size={[6.2, 0.14, 0.06]} position={[0, 0.1, -3.08]} color={c.trim} cast={false} />
-      <Box size={[0.06, 0.14, 6.2]} position={[-3.08, 0.1, 0]} color={c.trim} cast={false} />
-      {/* picture rail and two panel seams give the wall some architecture without another light */}
-      <Box size={[6.2, 0.05, 0.03]} position={[0, 2.92, -3.08]} color={c.trim} cast={false} />
-      <Box size={[0.03, 0.05, 6.2]} position={[-3.08, 2.92, 0]} color={c.trim} cast={false} />
-      {[-1.55, -0.05].map((z) => (
-        <Box key={z} size={[0.025, 2.82, 0.02]} position={[-3.09, 1.51, z]} color={c.wallSide} cast={false} />
-      ))}
+      <mesh position={[0, 1.9, -3.2]} receiveShadow material={walls[0]}>
+        <boxGeometry args={[6.2, 3.8, 0.16]} />
+      </mesh>
+      <mesh position={[-3.2, 1.9, -0.1]} receiveShadow material={walls[1]}>
+        <boxGeometry args={[0.16, 3.8, 6.4]} />
+      </mesh>
+      <Bevel size={[6.2, 0.13, 0.07]} position={[0, 0.09, -3.08]} color={c.trim} />
+      <Bevel size={[0.07, 0.13, 6.2]} position={[-3.08, 0.09, 0]} color={c.trim} />
+      <Box size={[6.2, 0.035, 0.025]} position={[0, 2.94, -3.1]} color={c.trim} />
+      <Box size={[0.025, 0.035, 6.2]} position={[-3.1, 2.94, 0]} color={c.trim} />
 
-      {/* window on the left wall — the sky follows the visitor's local time */}
-      <mesh position={[-3.085, 2.15, 0.9]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[2.0, 1.5]} />
+      <mesh position={[-3.105, 2.15, 0.9]} rotation={[0, Math.PI / 2, 0]}>
+        <planeGeometry args={[2.05, 1.55]} />
         <meshBasicMaterial color={sky} toneMapped={false} />
       </mesh>
-      <Box size={[0.1, 0.08, 2.14]} position={[-3.06, 2.94, 0.9]} color={c.cream} />
-      <Box size={[0.1, 0.08, 2.14]} position={[-3.06, 1.36, 0.9]} color={c.cream} />
-      <Box size={[0.1, 1.6, 0.08]} position={[-3.06, 2.15, -0.16]} color={c.cream} />
-      <Box size={[0.1, 1.6, 0.08]} position={[-3.06, 2.15, 1.96]} color={c.cream} />
-      <Box size={[0.1, 1.5, 0.05]} position={[-3.06, 2.15, 0.9]} color={c.cream} />
-      <Box size={[0.32, 0.06, 2.3]} position={[-2.95, 1.3, 0.9]} color={c.cream} />
+      <Instances limit={6} geometry={bevelGeometry} material={sharedMaterial(c.cream)} receiveShadow>
+        <Instance scale={[0.12, 0.09, 2.22]} position={[-3.03, 2.96, 0.9]} />
+        <Instance scale={[0.12, 0.09, 2.22]} position={[-3.03, 1.34, 0.9]} />
+        <Instance scale={[0.12, 1.7, 0.09]} position={[-3.03, 2.15, -0.18]} />
+        <Instance scale={[0.12, 1.7, 0.09]} position={[-3.03, 2.15, 1.98]} />
+        <Instance scale={[0.1, 1.56, 0.045]} position={[-3.0, 2.15, 0.9]} />
+        <Instance scale={[0.38, 0.075, 2.34]} position={[-2.93, 1.29, 0.9]} />
+      </Instances>
+      <mesh position={[-2.99, 2.15, 1.91]} rotation={[0, Math.PI / 2, 0]}>
+        <planeGeometry args={[0.13, 1.48]} />
+        <meshStandardMaterial color="#6b5c50" map={tex.weave} roughness={1} side={THREE.DoubleSide} />
+      </mesh>
 
-      {/* desk against the back wall */}
-      <Box size={[2.8, 0.1, 1.05]} position={[-0.55, 1.0, -2.55]} color={c.desk} cast />
-      {([[-1.85, -2.15], [0.75, -2.15], [-1.85, -2.98], [0.75, -2.98]] as const).map(([x, z]) => (
-        <Box key={`${x}${z}`} size={[0.08, 0.95, 0.08]} position={[x, 0.5, z]} color={c.deskLeg} />
-      ))}
+      <mesh geometry={bevelGeometry} position={[-0.55, 1.0, -2.55]} scale={[2.8, 0.115, 1.05]} castShadow receiveShadow material={wood} />
+      <Instances limit={4} geometry={bevelGeometry} material={sharedMaterial(c.deskLeg)} castShadow receiveShadow>
+        {([[-1.78, -2.16], [0.68, -2.16], [-1.78, -2.96], [0.68, -2.96]] as const).map(([x, z]) => (
+          <Instance key={`${x}${z}`} scale={[0.075, 0.94, 0.075]} position={[x, 0.5, z]} />
+        ))}
+      </Instances>
+      <Box size={[2.48, 0.045, 0.045]} position={[-0.55, 0.34, -2.94]} color={c.deskLeg} />
 
-      {/* stool — pushed in at the desk, turned with him toward the room */}
-      <Cyl r={0.34} h={0.08} position={[-0.45, 0.66, -2.5]} color={c.stool} cast />
-      <Cyl r={0.05} h={0.62} position={[-0.45, 0.33, -2.5]} color={c.metal} segments={8} />
-      <Cyl r={0.3} h={0.04} position={[-0.45, 0.04, -2.5]} color={c.metal} />
+      <Cyl r={0.32} h={0.09} position={[-0.45, 0.66, -2.5]} color={c.stool} cast />
+      <Cyl r={0.045} h={0.61} position={[-0.45, 0.33, -2.5]} color={c.metal} segments={16} />
+      <Cyl r={0.28} h={0.035} position={[-0.45, 0.04, -2.5]} color={c.metal} />
+      <Bevel size={[0.58, 0.5, 0.09]} position={[-0.45, 1.02, -2.77]} color={c.stool} rotation={[-0.08, 0, 0]} cast />
 
-      {/* rug */}
-      <Cyl r={1.55} h={0.02} position={[-0.3, 0.04, -0.6]} color={c.rug} segments={40} cast={false} />
-      <Cyl r={1.15} h={0.022} position={[-0.3, 0.045, -0.6]} color={c.rugInner} segments={40} cast={false} />
+      <mesh position={[-0.3, 0.025, -0.55]} scale={[1, 1, 0.74]} receiveShadow material={rug}>
+        <cylinderGeometry args={[1.6, 1.6, 0.025, 64]} />
+      </mesh>
+      <mesh position={[-0.3, 0.041, -0.55]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[1.43, 1.48, 64]} />
+        <meshStandardMaterial color={c.rugInner} roughness={1} side={THREE.DoubleSide} />
+      </mesh>
 
-      {/* plant in the front-left corner */}
-      <Cyl r={0.32} h={0.55} rTop={0.38} position={[-2.45, 0.3, 2.35]} color={c.plantPot} cast />
-      {([[0, 0.95, 0, 0.42], [0.18, 1.3, -0.1, 0.32], [-0.2, 1.22, 0.12, 0.3], [0.05, 1.6, 0.05, 0.24]] as const).map(([x, y, z, r], i) => (
-        <mesh key={i} position={[-2.45 + x, y, 2.35 + z]} castShadow>
-          <icosahedronGeometry args={[r, 0]} />
-          <meshStandardMaterial color={i % 2 ? c.leafDark : c.leaf} roughness={0.9} flatShading />
-        </mesh>
-      ))}
+      <Cyl r={0.27} h={0.48} rTop={0.34} position={[-2.5, 0.26, 2.25]} color={c.plantPot} cast />
+      <Instances limit={4} castShadow>
+        <sphereGeometry args={[1, 18, 12]} />
+        <meshStandardMaterial roughness={0.82} />
+        {([[0, 0.93, 0, 0.42, -0.3], [0.16, 1.25, -0.08, 0.36, 0.5], [-0.18, 1.13, 0.1, 0.34, -0.8], [0.02, 1.48, 0.02, 0.29, 0.15]] as const).map(([x, y, z, r, rz], i) => (
+          <Instance key={i} color={i % 2 ? c.leafDark : c.leaf} position={[-2.5 + x, y, 2.25 + z]} rotation={[0.25, i * 1.3, rz]} scale={[r * 0.55, r, r * 0.28]} />
+        ))}
+      </Instances>
     </group>
   );
 }

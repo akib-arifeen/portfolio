@@ -1,10 +1,10 @@
 "use client";
 
-import { RoundedBox } from "@react-three/drei";
+import { Instance, Instances, RoundedBox } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { Box, Cyl } from "./Room";
+import { Bevel, Box, Cyl } from "./Room";
 import { scene as c, type Phase } from "./palette";
 
 /* The booth on the left wall: a quiet charcoal-and-cream kiosk. A standing-height lens, a screen,
@@ -14,7 +14,7 @@ import { scene as c, type Phase } from "./palette";
 export const BOOTH_POS = new THREE.Vector3(-2.72, 0, -1.35);
 export const BOOTH_ROT = Math.PI / 2 - 0.15;
 /** Full-size equipment: the cabinet is 1.9 m and the lens sits at about 1.55 m. */
-export const BOOTH_SCALE = 0.95;
+export const BOOTH_SCALE = 0.8;
 
 const CAB_W = 0.9;
 const CAB_D = 0.5;
@@ -266,15 +266,17 @@ export function Booth({ phase }: { phase: Phase }) {
 
   return (
     <group position={BOOTH_POS.toArray()} rotation={[0, BOOTH_ROT, 0]} scale={BOOTH_SCALE}>
-      {/* plinth and feet: a piece of furniture, not a set piece */}
-      <Box size={[CAB_W - 0.04, 0.06, CAB_D - 0.04]} position={[0, 0.03, 0]} color={c.boothCabinetEdge} cast />
-      {([[-0.36, -0.19], [0.36, -0.19], [-0.36, 0.19], [0.36, 0.19]] as const).map(([x, z]) => (
-        <Cyl key={`${x}${z}`} r={0.028} h={0.02} position={[x, 0.01, z]} color={c.boothInk} segments={12} cast />
-      ))}
+      <Bevel size={[CAB_W + 0.025, 0.075, CAB_D + 0.025]} position={[0, 0.04, 0]} color={c.boothCabinetEdge} cast />
+      <Instances limit={4} castShadow receiveShadow>
+        <cylinderGeometry args={[0.028, 0.028, 0.02, 12]} />
+        <meshStandardMaterial color={c.boothInk} roughness={0.7} />
+        {([[-0.36, -0.19], [0.36, -0.19], [-0.36, 0.19], [0.36, 0.19]] as const).map(([x, z]) => <Instance key={`${x}${z}`} position={[x, 0.01, z]} />)}
+      </Instances>
 
-      {/* cabinet: charcoal body, cream face, dark cap */}
-      <RoundedBox args={[CAB_W, BODY_H, CAB_D]} radius={0.02} smoothness={3} position={[0, BODY_Y, 0]} material={mats.cabinet} castShadow receiveShadow />
-      <Box size={[CAB_W + 0.02, 0.05, CAB_D + 0.02]} position={[0, BODY_Y + BODY_H / 2, 0]} color={c.boothCabinetEdge} />
+      <RoundedBox args={[CAB_W, BODY_H, CAB_D]} radius={0.028} smoothness={3} position={[0, BODY_Y, 0]} material={mats.cabinet} castShadow receiveShadow />
+      <Bevel size={[CAB_W + 0.035, 0.065, CAB_D + 0.035]} position={[0, BODY_Y + BODY_H / 2, 0]} color={c.boothCabinetEdge} cast />
+      <Box size={[0.006, BODY_H - 0.16, 0.008]} position={[CAB_W / 2 - 0.055, BODY_Y, FRONT_Z + 0.007]} color={c.boothCabinetEdge} />
+      <Box size={[CAB_W - 0.1, 0.006, 0.008]} position={[0, 0.68, FRONT_Z + 0.007]} color={c.boothCabinetEdge} />
       {/* cream is trim, not a lit face: a framed screen, a base line, the sign */}
       <RoundedBox args={[0.7, 0.5, 0.012]} radius={0.008} smoothness={2} position={[0, SCREEN_Y, FRONT_Z + 0.005]} material={mats.panel} />
       <Box size={[0.022, 1.6, 0.008]} position={[-CAB_W / 2 + 0.045, 1.0, FRONT_Z + 0.005]} color={c.boothPanel} />
@@ -295,24 +297,31 @@ export function Booth({ phase }: { phase: Phase }) {
         <meshStandardMaterial ref={screenLit} map={art.screen} emissive="#ffffff" emissiveMap={art.screen} emissiveIntensity={0.52} roughness={0.4} />
       </mesh>
 
-      {/* lens at standing eye height, with a small warm ring */}
-      <RoundedBox args={[0.26, 0.16, 0.06]} radius={0.02} smoothness={3} position={[0, LENS_Y, FRONT_Z + 0.02]} material={mats.ink} />
-      <group position={[0, LENS_Y, FRONT_Z + 0.052]}>
-        <Cyl r={0.062} h={0.018} position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]} color={c.boothCabinetEdge} segments={28} />
-        <Cyl r={0.05} h={0.014} position={[0, 0, 0.012]} rotation={[Math.PI / 2, 0, 0]} color={c.boothInk} segments={28} />
-        <Cyl r={0.034} h={0.008} position={[0, 0, 0.022]} rotation={[Math.PI / 2, 0, 0]} color="#0d1419" segments={24} />
-        <mesh position={[0.012, 0.012, 0.0275]}>
-          <circleGeometry args={[0.006, 10]} />
+      <RoundedBox args={[0.28, 0.18, 0.035]} radius={0.018} smoothness={3} position={[0, LENS_Y, FRONT_Z + 0.012]} material={mats.ink} />
+      <group position={[0, LENS_Y, FRONT_Z + 0.045]}>
+        <Cyl r={0.068} h={0.045} position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]} color={c.boothCabinetEdge} segments={32} />
+        <Cyl r={0.052} h={0.052} position={[0, 0, 0.018]} rotation={[Math.PI / 2, 0, 0]} color={c.boothInk} segments={32} />
+        <mesh position={[0, 0, 0.046]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.037, 0.037, 0.006, 32]} />
+          <meshPhysicalMaterial color="#152832" roughness={0.08} metalness={0.15} clearcoat={1} />
+        </mesh>
+        <mesh position={[0.012, 0.012, 0.051]}>
+          <circleGeometry args={[0.006, 12]} />
           <meshBasicMaterial color={c.boothGlow} />
         </mesh>
-        <mesh material={mats.accent} position={[0, 0, 0.016]}>
-          <torusGeometry args={[0.074, 0.004, 8, 32]} />
+        <mesh material={mats.accent} position={[0, 0, 0.024]}>
+          <torusGeometry args={[0.077, 0.0035, 8, 32]} />
         </mesh>
       </group>
+      <RoundedBox args={[0.14, 0.075, 0.025]} radius={0.012} smoothness={2} position={[0.29, LENS_Y, FRONT_Z + 0.014]} material={mats.panel} />
+      <mesh position={[0.29, LENS_Y, FRONT_Z + 0.028]}>
+        <planeGeometry args={[0.11, 0.05]} />
+        <meshStandardMaterial color="#f1e6cf" emissive="#ffd9a3" emissiveIntensity={0.12} roughness={0.72} />
+      </mesh>
 
-      {/* printer slot and the print waiting in it */}
+      <Bevel size={[0.46, 0.025, 0.085]} position={[0, SLOT_Y + 0.035, FRONT_Z + 0.035]} color={c.boothPanelEdge} />
       <Box size={[0.4, 0.055, 0.03]} position={[0, SLOT_Y, FRONT_Z + 0.012]} color={c.boothInk} />
-      <Box size={[0.44, 0.014, 0.02]} position={[0, SLOT_Y + 0.04, FRONT_Z + 0.018]} color={c.boothPanelEdge} />
+      <Box size={[0.36, 0.012, 0.07]} position={[0, SLOT_Y - 0.04, FRONT_Z + 0.04]} color={c.boothCabinetEdge} />
       <mesh position={[0.148, SLOT_Y + 0.01, FRONT_Z + 0.033]}>
         <circleGeometry args={[0.008, 12]} />
         <meshBasicMaterial color={c.boothGlow} toneMapped={false} />
@@ -325,6 +334,17 @@ export function Booth({ phase }: { phase: Phase }) {
         <planeGeometry args={[0.2, 0.05]} />
         <meshStandardMaterial map={art.plate} roughness={0.6} />
       </mesh>
+
+      <Instances limit={6} position={[0, 0.47, FRONT_Z + 0.012]}>
+        <boxGeometry args={[0.3, 0.012, 0.008]} />
+        <meshStandardMaterial color={c.boothInk} roughness={0.8} />
+        {[0, 1, 2, 3, 4, 5].map((i) => <Instance key={i} position={[0, i * 0.032, 0]} />)}
+      </Instances>
+      <Instances limit={4} position={[-0.405, 0.64, FRONT_Z + 0.013]}>
+        <capsuleGeometry args={[0.012, 0.58, 4, 8]} />
+        <meshStandardMaterial color="#3f3532" roughness={1} />
+        {[0, 1, 2, 3].map((i) => <Instance key={i} position={[i * 0.027, 0, Math.sin(i) * 0.006]} />)}
+      </Instances>
 
       {/* instructions hang on the side the camera sees: BOOTH_ROT turns local -x into the room and
           local +x into the back wall, so the +x side would be read by nobody */}
