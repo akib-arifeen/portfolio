@@ -175,6 +175,7 @@ export default function OsShell({ onExit }: { onExit(): void }) {
           onSearch={() => setSearchOpen(true)}
           onControlCentre={() => setCcOpen((o) => !o)}
           controlCentreOpen={ccOpen}
+          onExit={onExit}
         />
         <DesktopIcons
           onOpen={(path) => {
@@ -230,7 +231,7 @@ export default function OsShell({ onExit }: { onExit(): void }) {
             if (n?.action) run(n.action);
           }}
         />
-        {locked && <LockScreen onUnlock={unlock} />}
+        {locked && <LockScreen onUnlock={unlock} onExit={onExit} />}
       </div>
     </OsContext.Provider>
   );

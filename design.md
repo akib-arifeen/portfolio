@@ -136,9 +136,9 @@ must extend the same rule rather than restate it.
 
 - **Nav — N5, floating pill.** A small pill fixed near the top: wordmark on the left, links on the
   right, `--z-nav`, translucent paper with a hairline. Primary destinations on every page are
-  **Blog · Projects · Profile**, in that order. Studio-specific controls (the sound toggle) may sit
-  in the same pill as a utility, visually separated from the three links. The CV lives under
-  Profile, not in the nav.
+  **Blog · Projects · Profile**, in that order. The sound switch sits in the same pill on every
+  page as a utility, visually separated from the three links, so the room tone carries from the
+  studio into the pages after it. The CV lives under Profile, not in the nav.
 - **Footer — Ft5, statement, home only.** A large Fraunces statement line, then a quiet row of
   links and the letter-style sign-off. It stays on `/`; content pages end with their own close —
   `/blog` with the "Work with me" CTA, `/profile` with the contact links, `/projects` with the

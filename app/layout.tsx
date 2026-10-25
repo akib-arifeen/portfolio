@@ -29,6 +29,8 @@ export const metadata: Metadata = {
     description: siteDescription,
   },
   icons: { icon: "/icon.svg", apple: "/apple-icon.png" },
+  // every page states its own canonical; this is the one for the home page and the studio under it
+  alternates: { canonical: "/" },
 };
 
 export const viewport: Viewport = { themeColor: "#171b22", colorScheme: "dark" };

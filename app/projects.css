@@ -85,6 +85,7 @@
 .gpiece__title { font-size: var(--text-md); }
 .gpiece__line { color: var(--color-ink-2); font-size: var(--text-sm); }
 .gpiece__meta { color: var(--color-muted); font-family: var(--font-outlier); font-size: var(--text-sm); }
+.gpiece__alt { justify-self: start; font-size: var(--text-sm); color: var(--color-ink-2); text-underline-offset: 0.2em; }
 .gpiece__toggle {
   justify-self: start;
   min-height: 2.75rem;

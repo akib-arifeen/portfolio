@@ -7,6 +7,7 @@ export function VideoPlayer({ piece }: { piece: StudioPiece }) {
       <video
         className="gpiece__video"
         controls
+        playsInline
         preload="none"
         poster={piece.poster}
         width={piece.w}
@@ -21,6 +22,9 @@ export function VideoPlayer({ piece }: { piece: StudioPiece }) {
         <p className="gpiece__line">{piece.line}</p>
         <p className="gpiece__meta">{piece.w} × {piece.h} · {formatSeconds(piece.seconds)}</p>
       </figcaption>
+      <a className="gpiece__alt" href={piece.src} download>
+        Trouble playing it? Download the clip (MP4)
+      </a>
     </figure>
   );
 }

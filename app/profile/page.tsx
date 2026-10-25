@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { contact } from "@/lib/content";
 import { education, experience, headline, skills, statement } from "@/lib/profile";
 import { SiteNav } from "@/components/SiteNav";
+import SoundToggle from "@/components/SoundToggle";
 import { Timeline } from "@/components/profile/Timeline";
 import "../work.css";
 import "../profile.css";
@@ -13,12 +14,15 @@ export const metadata: Metadata = {
   title: "Profile",
   description: DESCRIPTION,
   openGraph: { title: "Profile · Akib Arifeen", description: DESCRIPTION },
+  alternates: { canonical: "/profile" },
 };
 
 export default function ProfilePage() {
   return (
     <main className="wrap profile">
-      <SiteNav current="/profile" />
+      <SiteNav current="/profile">
+        <SoundToggle />
+      </SiteNav>
 
       <header className="profile__head">
         <p className="kicker">{headline}</p>

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import BoothScreen from "./BoothScreen";
 import { useBooth } from "./useBooth";
+import { useScrollLock } from "@/lib/use-scroll-lock";
 
 /**
  * The booth as a native modal dialog: the page behind is inert, Escape closes it, focus stays inside.
@@ -13,6 +14,8 @@ export default function BoothExperience({ onClose, reducedMotion }: { onClose: (
   const dialog = useRef<HTMLDialogElement>(null);
   const booth = useBooth(true);
   const leaving = useRef(false);
+  // a modal dialog stops the pointer, but the document behind it still scrolls on the wheel and the keys
+  useScrollLock();
 
   const close = () => {
     if (leaving.current) return;

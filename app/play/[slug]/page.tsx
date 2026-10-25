@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { playItems } from "@/lib/os/playground";
 import { getWork } from "@/lib/work";
+import { PlayFrame } from "@/components/play/PlayFrame";
 import "../../work.css";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -16,7 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const item = playItems.find((p) => p.slug === slug);
   if (!item) return {};
   const title = `${item.name} · Akib Arifeen`;
-  return { title: item.name, description: item.blurb, openGraph: { title, description: item.blurb } };
+  return { title: item.name, description: item.blurb, openGraph: { title, description: item.blurb }, alternates: { canonical: `/play/${slug}` } };
 }
 
 export default async function PlayPage({ params }: Props) {
@@ -35,7 +36,7 @@ export default async function PlayPage({ params }: Props) {
         </div>
       </header>
       {item.embeddable ? (
-        <iframe className="play__frame" src={item.url} title={item.name} allow={item.allow} />
+        <PlayFrame src={item.url} title={item.name} allow={item.allow} sandbox={item.sandbox} />
       ) : (
         <div className="play__card">
           <h2>{item.name}</h2>

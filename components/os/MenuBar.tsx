@@ -62,7 +62,7 @@ function Mark() {
 
 const enabledIdx = (items: BarItem[]) => items.flatMap((it, i) => (it !== "separator" && !it.disabled ? [i] : []));
 
-export default function MenuBar({ app, onAction, onSearch, onControlCentre, controlCentreOpen }: MenuBarProps) {
+export default function MenuBar({ app, onAction, onSearch, onControlCentre, controlCentreOpen, onExit }: MenuBarProps) {
   const name = app?.name ?? "Files";
   const [open, setOpen] = useState<number | null>(null);
   const [active, setActive] = useState(-1);
@@ -256,6 +256,7 @@ export default function MenuBar({ app, onAction, onSearch, onControlCentre, cont
           </svg>
         </span>
         <Clock />
+        <button type="button" className="os-bar-exit" aria-label="Close the laptop" onClick={onExit}>Close</button>
       </div>
     </div>
   );

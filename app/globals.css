@@ -399,6 +399,10 @@ a { color: inherit; }
   color: var(--color-muted);
 }
 .tool--clock:hover { color: var(--color-ink); }
+@media (pointer: coarse) {
+  /* the room's two smallest controls keep their look but grow to a full touch target */
+  .tool, .room-link { min-height: 44px; }
+}
 
 .detail__body { animation: detail-in var(--dur-short) var(--ease-out); }
 @keyframes detail-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
