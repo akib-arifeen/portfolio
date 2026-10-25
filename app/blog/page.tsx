@@ -5,6 +5,7 @@ import type { Work } from "@/lib/work";
 import { contact } from "@/lib/content";
 import { BlogCard } from "@/components/blog/BlogCard";
 import { SiteNav } from "@/components/SiteNav";
+import SoundToggle from "@/components/SoundToggle";
 import "../work.css";
 import "../blog.css";
 
@@ -15,6 +16,7 @@ export const metadata: Metadata = {
   title: "Blog",
   description: DESCRIPTION,
   openGraph: { title: "Blog · Akib Arifeen", description: DESCRIPTION },
+  alternates: { canonical: "/blog" },
 };
 
 const LIVE: Work["status"][] = ["shipped", "in production"];
@@ -30,7 +32,9 @@ export default function BlogIndex() {
 
   return (
     <main className="wrap work">
-      <SiteNav current="/blog" />
+      <SiteNav current="/blog">
+        <SoundToggle />
+      </SiteNav>
 
       <header className="work__head">
         <p className="kicker">Case studies and essays</p>
@@ -51,8 +55,7 @@ export default function BlogIndex() {
         <div className="wgroup__head">
           <h2 id="notes-h" className="wgroup__title">Notes and essays</h2>
           <p className="wgroup__lede">
-            Three shorter pieces from inside the builds: a room with no daylight, a queue waiting for RAM, and
-            the night the booth had to work.
+            Shorter pieces from inside the builds: the moments that did not fit a project page.
           </p>
         </div>
         <div className="wlist wlist--grid">

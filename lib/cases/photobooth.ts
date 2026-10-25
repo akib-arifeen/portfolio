@@ -15,7 +15,7 @@ const work: Work = {
     cover: {
       kind: "image",
       src: "/work/photobooth/booth-card.jpg",
-      alt: "The 3D photobooth on this site after a run: a printed card with a portrait and the title Akib's Studio held in front of the red booth.",
+      alt: "A printed card from the 3D photobooth demo, with a portrait and the title Akib's Studio, held in front of the booth's earlier red cabinet.",
       w: 1600,
       h: 1000,
       caption: "The 3D photobooth on this site, a playable homage to the real one. This is its printed card, shown in demo mode with my own photo.",
@@ -52,7 +52,7 @@ const work: Work = {
           {
             kind: "image",
             src: "/work/photobooth/studio-room.jpg",
-            alt: "The isometric 3D studio room with the red photobooth marked PHOTOS beside a plant, and a desk with a small avatar of Akib.",
+            alt: "The isometric 3D studio room in the earlier red-booth build: a red photobooth marked PHOTOS beside a plant, and a desk with a small avatar of Akib.",
             w: 1600,
             h: 1000,
             caption: "The booth in its room. Pick the photobooth on the home page to walk up to it.",

@@ -41,10 +41,8 @@ export default function CountUp({ text }: { text: string }) {
     };
   }, [text]);
 
+  // One copy of the number, not two: the link that carries it is named in full by its own label.
   return (
-    <>
-      <span className="visually-hidden">{text}</span>
-      <span ref={ref} aria-hidden="true">{text}</span>
-    </>
+    <span ref={ref} aria-hidden="true">{text}</span>
   );
 }

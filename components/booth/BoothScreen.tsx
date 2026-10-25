@@ -86,7 +86,8 @@ export default function BoothScreen({ booth: b, onStepAway }: { booth: Booth; on
         )}
 
         {b.step === "countdown" && (
-          <span className="booth__count" key={b.count} aria-live="assertive">{b.count}</span>
+          // the panel's status line is the live region; the big numeral is decoration and must not double-announce
+          <span className="booth__count" key={b.count} aria-hidden="true">{b.count}</span>
         )}
 
         {b.step === "developing" && (
@@ -115,7 +116,7 @@ export default function BoothScreen({ booth: b, onStepAway }: { booth: Booth; on
               <h2 className="booth__title" id="booth-heading" data-booth-heading tabIndex={-1}>Step up and say cheese.</h2>
               <p className="booth__text">
                 The kiosk in the room is a model of the booth I built: a camera, {styles.length} looks and a card.
-                Nothing you take is stored here.
+                Nothing you take is kept by this site.
               </p>
               <ol className="booth__steps">
                 <li className="booth__step">
@@ -258,7 +259,7 @@ export default function BoothScreen({ booth: b, onStepAway }: { booth: Booth; on
 
         <p className="booth__note">
           {b.step === "developing"
-            ? "Nothing is stored on this site."
+            ? "This site stores nothing; the AI service handles the photo for the restyle."
             : "A real booth I built for events: 200 to 300 guests a night. This page is the demo."}
         </p>
       </div>

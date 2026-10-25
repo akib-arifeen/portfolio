@@ -27,6 +27,7 @@ export function FilmFrame({ film }: { film: Film }) {
           <video
             className="gpiece__video"
             controls
+            playsInline
             preload="none"
             poster={film.poster}
             width={film.w}
@@ -43,6 +44,9 @@ export function FilmFrame({ film }: { film: Film }) {
         <p className="gpiece__line">{film.line}</p>
         <p className="gpiece__meta">{film.w} × {film.h} · {formatSeconds(film.seconds)}</p>
       </figcaption>
+      <a className="gpiece__alt" href={film.src} download>
+        Trouble playing it? Download the film (MP4)
+      </a>
       <button
         type="button"
         className="gpiece__toggle"

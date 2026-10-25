@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const item = getBlogItem(slug);
   if (!item) return {};
   const [title, summary] = item.kind === "case" ? [item.work.title, item.work.summary] : [item.post.title, item.post.summary];
-  return { title, description: summary, openGraph: { title: `${title} · Akib Arifeen`, description: summary } };
+  return { title, description: summary, openGraph: { title: `${title} · Akib Arifeen`, description: summary }, alternates: { canonical: `/blog/${slug}` } };
 }
 
 export default async function BlogPostPage({ params }: Props) {
