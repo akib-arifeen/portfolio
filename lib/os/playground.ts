@@ -2,6 +2,36 @@
 // url/embeddable verified 2026-10-23 with `curl -sIL`: no X-Frame-Options or frame-ancestors on the live sites. Twinkle is live but opens in its own tab because its pairing demo needs two tabs.
 import type { PlayItem } from "./types";
 
+/** Capabilities a play page may hand to a third-party frame. Camera and microphone are only
+    delegated after the visitor asks for them; everything else (autoplay, fullscreen, gamepad) is
+    safe to grant up front so the game can start. */
+export type PlayPermissions = {
+  /** The allow tokens the frame gets without asking, e.g. "autoplay; fullscreen". */
+  base: string;
+  camera: boolean;
+  microphone: boolean;
+};
+
+const MEDIA_FEATURES = ["camera", "microphone"] as const;
+
+export function playPermissions(allow?: string): PlayPermissions {
+  const tokens = (allow ?? "").split(";").map((t) => t.trim()).filter(Boolean);
+  return {
+    base: tokens.filter((t) => !MEDIA_FEATURES.includes(t as (typeof MEDIA_FEATURES)[number])).join("; "),
+    camera: tokens.includes("camera"),
+    microphone: tokens.includes("microphone"),
+  };
+}
+
+/** The allow attribute for a frame, with the visitor-gated capabilities only when granted. */
+export function allowFor(perms: PlayPermissions, shared: boolean): string | undefined {
+  const tokens = [perms.base, shared && perms.camera ? "camera" : "", shared && perms.microphone ? "microphone" : ""]
+    .filter(Boolean)
+    .join("; ");
+  return tokens || undefined;
+}
+
+
 export const playItems: PlayItem[] = [
   {
     slug: "gravity-wars",

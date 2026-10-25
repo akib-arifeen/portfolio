@@ -9,7 +9,7 @@ I am Akib Arifeen, a software engineer in Hong Kong at See Change Education (Asi
 - **The 3D studio.** A React Three Fiber room with a desk, a monitor loop and a character. Click a spot to read about a project.
 - **The photobooth.** A 3D booth and a screen UI. It sends your photo to an image model through `app/api/booth/route.ts`. There is a free mock mode that spends nothing.
 - **The laptop layer.** A desktop-style shell (windows, dock, menu bar, search, terminal, notes, photos, a small browser and a playground). On a phone it becomes a full screen app launcher.
-- **Case studies.** One page per project under `/work/<slug>`, written from my own work record. Media lives in `public/work`.
+- **Case studies.** One page per project under `/blog/<slug>`, written from my own work record. Media lives in `public/work`.
 
 ## Stack
 
@@ -65,7 +65,7 @@ Never commit `.env.local`.
 
 ```
 app/            routes, layout, metadata, sitemap, robots, social image, icons
-  work/         case study index and /work/[slug]
+  blog/         case studies and essays: the index and /blog/[slug]
   play/         /play/[slug] pages for games that run inside the site
   api/booth/    photobooth endpoint
 components/

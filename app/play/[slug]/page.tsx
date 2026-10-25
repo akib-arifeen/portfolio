@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { playItems } from "@/lib/os/playground";
 import { getWork } from "@/lib/work";
+import { PlayFrame } from "@/components/play/PlayFrame";
 import "../../work.css";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -35,7 +36,7 @@ export default async function PlayPage({ params }: Props) {
         </div>
       </header>
       {item.embeddable ? (
-        <iframe className="play__frame" src={item.url} title={item.name} allow={item.allow} />
+        <PlayFrame src={item.url} title={item.name} allow={item.allow} />
       ) : (
         <div className="play__card">
           <h2>{item.name}</h2>

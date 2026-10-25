@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./studio/studio.css";
 import { projects, spotLabels, studioNotes, type StudioSpot } from "@/lib/content";
+import { studioLayerFromHash, STUDIO_OPEN_EVENT, type StudioLayer } from "@/lib/hash-nav";
 import { studioSound } from "@/lib/sound";
 import { phaseForHour, phases, type Phase } from "./studio/palette";
 import BoothExperience from "./booth/BoothExperience";
@@ -215,12 +216,21 @@ export default function Hero() {
   linkRef.current = { booth: openBooth, laptop: openLaptop };
   useEffect(() => {
     const follow = () => {
-      if (location.hash === "#booth") linkRef.current.booth();
-      else if (location.hash === "#laptop") linkRef.current.laptop();
+      const layer = studioLayerFromHash(location.hash);
+      if (layer) linkRef.current[layer]();
     };
     follow();
     window.addEventListener("hashchange", follow);
-    return () => window.removeEventListener("hashchange", follow);
+    // a tile whose hash is already in the address bar cannot fire hashchange; it asks us directly
+    const reopen = (e: Event) => {
+      const layer = (e as CustomEvent<StudioLayer>).detail;
+      if (layer === "booth" || layer === "laptop") linkRef.current[layer]();
+    };
+    window.addEventListener(STUDIO_OPEN_EVENT, reopen);
+    return () => {
+      window.removeEventListener("hashchange", follow);
+      window.removeEventListener(STUDIO_OPEN_EVENT, reopen);
+    };
   }, []);
 
   const openFromButton = (id: StudioSpot) => {

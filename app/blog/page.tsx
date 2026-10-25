@@ -51,8 +51,7 @@ export default function BlogIndex() {
         <div className="wgroup__head">
           <h2 id="notes-h" className="wgroup__title">Notes and essays</h2>
           <p className="wgroup__lede">
-            Three shorter pieces from inside the builds: a room with no daylight, a queue waiting for RAM, and
-            the night the booth had to work.
+            Shorter pieces from inside the builds: the moments that did not fit a project page.
           </p>
         </div>
         <div className="wlist wlist--grid">
