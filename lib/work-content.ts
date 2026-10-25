@@ -13,6 +13,7 @@ import culinaryCompanion from "./cases/culinary-companion";
 import shortestPath from "./cases/shortest-path";
 import twinkleStar from "./cases/twinkle-star";
 import saveYourPrincess from "./cases/save-your-princess";
+import codeDrawn from "./cases/code-drawn";
 
 export const works: Work[] = [
   videoStudio,
@@ -28,4 +29,5 @@ export const works: Work[] = [
   shortestPath,
   twinkleStar,
   saveYourPrincess,
+  codeDrawn,
 ];

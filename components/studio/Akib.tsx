@@ -8,6 +8,9 @@ import { scene as c } from "./palette";
 
 export type AkibPose = "typing" | "wave" | "talk" | "listen" | "nod";
 
+export const AKIB_POSITION: [number, number, number] = [-0.45, 0.7, -2.85];
+export const AKIB_TORSO_FORWARD_REACH = 0.3;
+
 export type AkibProps = {
   reducedMotion: boolean;
   /** typing at the desk by default; "wave" when the visitor looks at him; "talk"/"listen" for the Ask-Akib twin. */
@@ -294,6 +297,7 @@ function buildKit() {
     return geometry;
   })];
   const hairGeometry = mergeGeometries(hairParts)!;
+  hairGeometry.scale(1, 0.88, 1);
   hairParts.forEach((part) => part.dispose());
 
   const handParts: THREE.BufferGeometry[] = [];
@@ -451,13 +455,13 @@ function target(pose: AkibPose, t: number, tw: number, glance: number, mot: numb
   o[KNEE] = mot * s(t * 1.1) * 0.07;
   // resting arms-at-the-keys values, reused by typing, nod
   const keys = (speed: number, amp: number) => {
-    o[R_X] = -1.15; o[L_X] = -1.15;
+    o[R_X] = -1.32; o[L_X] = -1.32;
     o[R_Y] = 0.45; o[L_Y] = 0.75;
     o[R_Z] = -0.05; o[L_Z] = 0.05;
-    o[R_EL] = -0.7 + mot * amp * 0.06 * s(t * speed);
-    o[L_EL] = -0.7 + mot * amp * 0.06 * s(t * speed + Math.PI);
-    o[R_WR] = mot * amp * 0.14 * s(t * speed + 0.6);
-    o[L_WR] = mot * amp * 0.14 * s(t * speed + Math.PI + 0.6);
+    o[R_EL] = -0.45 + mot * amp * 0.04 * s(t * speed);
+    o[L_EL] = -0.45 + mot * amp * 0.04 * s(t * speed + Math.PI);
+    o[R_WR] = mot * amp * 0.08 * s(t * speed + 0.6);
+    o[L_WR] = mot * amp * 0.08 * s(t * speed + Math.PI + 0.6);
   };
   const lap = () => {
     o[R_X] = -0.35; o[L_X] = -0.35;
@@ -468,10 +472,10 @@ function target(pose: AkibPose, t: number, tw: number, glance: number, mot: numb
   switch (pose) {
     case "typing": {
       const amp = 0.7 + 0.3 * s(t * 0.8);
-      o[HIPS] = 0.2; o[SPINE] = -0.05; o[HEAD] = 0.8 + glance * 0.35;
-      o[LEAN] = 0.16; o[PITCH] = 0.1 + mot * 0.02 * s(t * 0.8);
-      o[SMILE] = 0.9;
-      o[MOUTH] = 0.15;
+      o[HIPS] = 0.2; o[SPINE] = -0.05; o[HEAD] = 0.55 + glance * 0.2;
+      o[LEAN] = 0.12; o[PITCH] = 0.12 + mot * 0.01 * s(t * 0.8);
+      o[SMILE] = 0.35;
+      o[MOUTH] = 0.08;
       keys(13, amp);
       break;
     }
@@ -658,7 +662,7 @@ export default function Akib(props: AkibProps) {
   );
 
   return (
-    <group position={[-0.45, 0.7, -2.5]} rotation={[0, 1.62, 0]} dispose={null}>
+    <group position={AKIB_POSITION} rotation={[0, 1.62, 0]} dispose={null}>
       <group scale={0.98}>
         <group ref={hips} position={[0, 0.12, 0]}>
           <mesh geometry={g.unit} material={m.pants} scale={[0.25, 0.14, 0.2]} castShadow />
@@ -675,7 +679,7 @@ export default function Akib(props: AkibProps) {
                 <mesh geometry={g.neck} material={m.skinF} position={[0, 0.03, 0]} castShadow />
                 <mesh geometry={g.collar} material={m.trim} rotation={[Math.PI / 2, 0, 0]} position={[0, -0.01, 0.005]} scale={[1, 1.05, 1]} />
                 <group ref={head} position={[0, 0.1, 0]}>
-                  <group position={[0, 0.32, 0]} scale={1.1}>
+                  <group position={[0, 0.32, 0]} scale={0.92}>
                     <mesh geometry={g.skin} material={m.skinS} castShadow />
                     <mesh geometry={g.face} material={m.face} />
 

@@ -8,6 +8,10 @@ import { scene as c } from "./palette";
 
 type V3 = [number, number, number];
 
+export const DESK_CENTER: V3 = [-0.55, 1.0, -1.95];
+export const DESK_DEPTH = 1.05;
+export const DESK_BACK_EDGE_Z = DESK_CENTER[2] - DESK_DEPTH / 2;
+
 const materials = new Map<string, THREE.MeshStandardMaterial>();
 const bevelGeometry = new RoundedBoxGeometry(1, 1, 1, 2, 0.055);
 
@@ -167,18 +171,18 @@ export function Room({ sky }: { sky: string }) {
         <meshStandardMaterial color="#6b5c50" map={tex.weave} roughness={1} side={THREE.DoubleSide} />
       </mesh>
 
-      <mesh geometry={bevelGeometry} position={[-0.55, 1.0, -2.55]} scale={[2.8, 0.115, 1.05]} castShadow receiveShadow material={wood} />
+      <mesh geometry={bevelGeometry} position={DESK_CENTER} scale={[2.8, 0.115, DESK_DEPTH]} castShadow receiveShadow material={wood} />
       <Instances limit={4} geometry={bevelGeometry} material={sharedMaterial(c.deskLeg)} castShadow receiveShadow>
-        {([[-1.78, -2.16], [0.68, -2.16], [-1.78, -2.96], [0.68, -2.96]] as const).map(([x, z]) => (
+        {([[-1.78, -1.56], [0.68, -1.56], [-1.78, -2.36], [0.68, -2.36]] as const).map(([x, z]) => (
           <Instance key={`${x}${z}`} scale={[0.075, 0.94, 0.075]} position={[x, 0.5, z]} />
         ))}
       </Instances>
-      <Box size={[2.48, 0.045, 0.045]} position={[-0.55, 0.34, -2.94]} color={c.deskLeg} />
+      <Box size={[2.48, 0.045, 0.045]} position={[-0.55, 0.34, -2.34]} color={c.deskLeg} />
 
-      <Cyl r={0.32} h={0.09} position={[-0.45, 0.66, -2.5]} color={c.stool} cast />
-      <Cyl r={0.045} h={0.61} position={[-0.45, 0.33, -2.5]} color={c.metal} segments={16} />
-      <Cyl r={0.28} h={0.035} position={[-0.45, 0.04, -2.5]} color={c.metal} />
-      <Bevel size={[0.58, 0.5, 0.09]} position={[-0.45, 1.02, -2.77]} color={c.stool} rotation={[-0.08, 0, 0]} cast />
+      <Cyl r={0.32} h={0.09} position={[-0.45, 0.66, -2.85]} color={c.stool} cast />
+      <Cyl r={0.045} h={0.61} position={[-0.45, 0.33, -2.85]} color={c.metal} segments={16} />
+      <Cyl r={0.28} h={0.035} position={[-0.45, 0.04, -2.85]} color={c.metal} />
+      <Bevel size={[0.58, 0.5, 0.09]} position={[-0.45, 1.02, -3.06]} color={c.stool} rotation={[-0.08, 0, 0]} cast />
 
       <mesh position={[-0.3, 0.025, -0.55]} scale={[1, 1, 0.74]} receiveShadow material={rug}>
         <cylinderGeometry args={[1.6, 1.6, 0.025, 64]} />

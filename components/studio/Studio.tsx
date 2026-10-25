@@ -1,7 +1,7 @@
 "use client";
 
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { Html, Instance, Instances, OrbitControls, PerformanceMonitor, PerspectiveCamera } from "@react-three/drei";
+import { Instance, Instances, OrbitControls, PerformanceMonitor, PerspectiveCamera } from "@react-three/drei";
 import { Component, memo, useCallback, useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from "react";
 import * as THREE from "three";
 import { Bevel, Box, Cyl, Room } from "./Room";
@@ -9,7 +9,7 @@ import Akib, { type AkibPose } from "./Akib";
 import StudioFallback from "./StudioFallback";
 import { lights, scene as c, type Phase } from "./palette";
 import { BOOTH_POS, Booth } from "./Photobooth";
-import { spotLabels, type StudioSpot } from "@/lib/content";
+import { type StudioSpot } from "@/lib/content";
 
 type V3 = [number, number, number];
 /** The OrbitControls instance drei hands back through its ref. */
@@ -26,9 +26,9 @@ export const spotFocus: Record<StudioSpot, V3> = {
   zoom: [1.95, 2.15, -2.85],
   workout: [2.55, 2.1, -2.85],
   culinary: [1.65, 1.45, -2.85],
-  mic: [0.62, 1.5, -2.45],
-  me: [-0.45, 1.55, -2.45],
-  laptop: [-0.02, 1.18, -2.52],
+  mic: [0.62, 1.5, -2.0],
+  me: [-0.45, 1.55, -2.85],
+  laptop: [-0.02, 1.18, -2.15],
 };
 
 export type StudioProps = {
@@ -177,11 +177,6 @@ function Scene({ phase, selected, onSelect, onCycleLight, onHover, reducedMotion
       >
         <planeGeometry args={[2.0, 1.5]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-        {hovered === "window" && (
-          <Html position={[0, 1.0, 0]} center zIndexRange={[15, 0]}>
-            <span className="tag">Change the light</span>
-          </Html>
-        )}
       </mesh>
 
       {spot("video", [0, 0.55, 0], <Monitor phase={phase} playing={active && !reducedMotion && selected === "video"} />)}
@@ -222,11 +217,6 @@ function Spot({ id, label, hovered, selected, onHover, onSelect, reducedMotion, 
   return (
     <group ref={ref} onPointerOver={disabled ? undefined : over} onPointerOut={disabled ? undefined : out} onClick={disabled ? undefined : (e) => { if (e.delta > CLICK_SLOP) return; e.stopPropagation(); onSelect(id); }}>
       {children}
-      {!disabled && hovered === id && selected !== id && (
-        <Html position={[spotFocus[id][0] + label[0], spotFocus[id][1] + label[1], spotFocus[id][2] + label[2]]} center zIndexRange={[15, 0]}>
-          <span className="tag">{spotLabels[id]}</span>
-        </Html>
-      )}
     </group>
   );
 }
@@ -237,10 +227,10 @@ const ISO_DIR = new THREE.Vector3(1, 0.66, 1).normalize();
 const RIGHT = new THREE.Vector3(1, 0, -1).normalize();
 const UP = new THREE.Vector3().crossVectors(RIGHT, ISO_DIR).multiplyScalar(-1).normalize();
 const WORKSTATION = new THREE.Vector3(-0.75, 1.6, -1.65);
-const HOME_TARGET = new THREE.Vector3(-0.25, 1.38, -2.25);
-const DESKTOP_CAMERA = new THREE.Vector3(1.65, 2.2, 1.15);
-const PHONE_TARGET = new THREE.Vector3(-0.22, 1.4, -2.35);
-const PHONE_CAMERA = new THREE.Vector3(1.45, 2.12, 0.55);
+const HOME_TARGET = new THREE.Vector3(-0.2, 1.25, -2.25);
+const DESKTOP_CAMERA = new THREE.Vector3(2.15, 2.15, 2.3);
+const PHONE_TARGET = new THREE.Vector3(-0.15, 1.3, -2.25);
+const PHONE_CAMERA = new THREE.Vector3(1.85, 2.1, 1.6);
 
 function CameraRig({ cam: camRef, controls: controlsRef, selected, reducedMotion, explore }: { cam: React.RefObject<THREE.PerspectiveCamera | null>; controls: React.RefObject<OrbitHandle | null>; selected: StudioSpot | null; reducedMotion: boolean; explore: boolean }) {
   const { size } = useThree();
@@ -372,7 +362,7 @@ function Lights({ phase, reducedMotion }: { phase: Phase; reducedMotion: boolean
 /** A real project still at rest; only an explicit monitor selection downloads and plays the clip. */
 function useMonitorTexture(playing: boolean) {
   const poster = useMemo(() => {
-    const t = new THREE.TextureLoader().load("/work/video-studio/water-cycle.jpg");
+    const t = new THREE.TextureLoader().load("/work/lesson-pipeline/review-page.png");
     t.colorSpace = THREE.SRGBColorSpace;
     return t;
   }, []);
@@ -422,10 +412,10 @@ function Monitor({ phase, playing }: { phase: Phase; playing: boolean }) {
   );
 }
 
-/** The laptop shows a real screen from the video-studio project. If it cannot load, the screen stays dark — no invented desktop. */
+/** The laptop shows the real video-studio planning interface. */
 function useLaptopScreenTexture() {
   const tex = useMemo(() => {
-    const t = new THREE.TextureLoader().load("/work/video-studio/cinematic-contact.jpg");
+    const t = new THREE.TextureLoader().load("/work/video-studio/create-screen.png");
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 4;
     return t;
@@ -493,7 +483,7 @@ function useLaptopDeckTexture() {
   return tex;
 }
 
-const LAPTOP_POS: V3 = [-0.02, 1.07, -2.52];
+export const LAPTOP_POS: V3 = [-0.02, 1.07, -2.15];
 const LAPTOP_SCALE = 1.35;
 
 function Laptop() {
@@ -539,7 +529,7 @@ function Lamp({ phase }: { phase: Phase }) {
     if (glow.current) glow.current.emissiveIntensity += ((target > 0 ? 1.15 : 0.05) - glow.current.emissiveIntensity) * k;
   });
   return (
-    <group position={[0.55, 1.05, -2.8]}>
+    <group position={[0.55, 1.05, -2.25]}>
       <Cyl r={0.13} h={0.04} position={[0, 0.02, 0]} color={c.metal} />
       <Box size={[0.03, 0.6, 0.03]} position={[0, 0.32, 0]} color={c.metal} rotation={[0.25, 0, 0]} />
       <mesh position={[0, 0.66, 0.12]} rotation={[0.5, 0, 0]} castShadow>
@@ -559,7 +549,7 @@ function Mic() {
   return (
     <group>
       {/* microphone */}
-      <group position={[0.62, 1.07, -2.45]}>
+      <group position={[0.62, 1.07, -2.0]}>
         <Cyl r={0.1} h={0.03} position={[0, 0.01, 0]} color={c.metal} />
         <Cyl r={0.015} h={0.4} position={[0, 0.22, 0]} color={c.metal} segments={6} />
         <mesh position={[0, 0.48, 0]} castShadow>
@@ -568,7 +558,7 @@ function Mic() {
         </mesh>
       </group>
       {/* small mixer */}
-      <group position={[-1.6, 1.08, -2.42]}>
+      <group position={[-1.6, 1.08, -2.1]}>
         <Box size={[0.5, 0.07, 0.34]} position={[0, 0, 0]} color={c.metal} />
         {[-0.15, 0, 0.15].map((x, i) => (
           <Box key={x} size={[0.04, 0.03, 0.07]} position={[x, 0.05, -0.04 + i * 0.05]} color={c.cream} />

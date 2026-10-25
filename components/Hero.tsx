@@ -1,7 +1,6 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./studio/studio.css";
 import { projects, spotLabels, studioNotes, type StudioSpot } from "@/lib/content";
@@ -123,13 +122,12 @@ export default function Hero() {
   const openLaptop = useCallback(() => {
     cancelDeskOpen();
     deskTrigger.current = focusedTrigger() ?? laptopChip.current;
-    setSelected("laptop");
+    setSelected(null);
     setExplore(false);
-    setBoothOpen(false); // the desk and the booth never stack
+    setBoothOpen(false);
     studioSound.blip("open");
-    // the laptop opens as its own layer once the camera has settled on it
-    deskTimer.current = setTimeout(() => { deskTimer.current = null; setDeskOpen(true); }, reducedMotion ? 0 : 280);
-  }, [cancelDeskOpen, reducedMotion]);
+    setDeskOpen(true);
+  }, [cancelDeskOpen]);
 
   const openBooth = useCallback(() => {
     cancelDeskOpen(); // a pending laptop open must not land behind the booth
@@ -317,15 +315,12 @@ export default function Hero() {
       <section className="hero" id="top" aria-label="Studio">
         <div className="wrap hero__grid">
           <div className="hero__copy">
-            <p className="hero__eyebrow">Hong Kong <span aria-hidden="true">·</span> software engineer</p>
-            <h1 className="hero__title">I make AI feel <mark>handmade</mark>.</h1>
-            <p className="hero__note">
-              I build AI products end to end, from the GPU server to the last sound effect. Open the laptop for
-              the work, or step into the booth.
-            </p>
+            <p className="hero__eyebrow">Software / web engineer <span aria-hidden="true">·</span> Hong Kong</p>
+            <h1 className="hero__title">I design and build <mark>strong systems</mark>, end to end.</h1>
+            <p className="hero__note">Architecture, reliable infrastructure, and interfaces people can use.</p>
             <div className="hero__actions">
               <button ref={laptopChip} type="button" className="action action--primary" onClick={openLaptop}>
-                Open my laptop
+                Open engineering case files
                 <span className="action__go" aria-hidden="true">↗</span>
               </button>
               <button ref={boothChip} type="button" className="action" onClick={openBooth} aria-haspopup="dialog">
@@ -445,18 +440,7 @@ export default function Hero() {
                       <button type="button" className="chip" onClick={() => setSelected(null)}>Back to the room</button>
                     </div>
                   </>
-                ) : (
-                  <div className="detail__default">
-                    <p className="detail__hint">
-                      Everything here is something I made: the room, the booth, the sounds. Choose an object in the
-                      scene, or one from the list.
-                    </p>
-                    <div className="detail__actions">
-                      <Link className="chip" href="/blog">All work</Link>
-                      <Link className="chip" href="/projects">Projects</Link>
-                    </div>
-                  </div>
-                )}
+                ) : null}
               </div>
             </section>
           </div>

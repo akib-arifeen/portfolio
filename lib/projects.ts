@@ -43,6 +43,7 @@ const CATEGORY_BY_SLUG: Record<string, ProjectCategoryId> = {
   "gravity-wars": "games",
   "save-your-princess": "games",
   "agent-quest": "experiments",
+  "code-drawn": "experiments",
   "culinary-companion": "experiments",
   "portfolio-v1": "experiments",
 };
