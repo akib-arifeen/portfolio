@@ -258,7 +258,7 @@ export default function Hero() {
 
       <section className="hero" id="top" aria-label="Studio">
         <div className="wrap hero__grid">
-          <div className="hero__copy reveal">
+          <div className="hero__copy">
             <p className="hero__eyebrow">Hong Kong <span aria-hidden="true">·</span> software engineer</p>
             <h1 className="hero__title">I make AI feel <mark>handmade</mark>.</h1>
             <p className="hero__note">
