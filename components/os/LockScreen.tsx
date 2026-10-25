@@ -10,10 +10,11 @@ function clock(d: Date) {
 }
 
 /** Covers the desktop until the visitor logs in; once per session (OsShell remembers it). */
-export default function LockScreen({ onUnlock }: LockScreenProps) {
+export default function LockScreen({ onUnlock, onExit }: LockScreenProps) {
   const [now, setNow] = useState(() => new Date());
   const [unlocking, setUnlocking] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
   const busy = useRef(false);
 
   useEffect(() => {
@@ -30,11 +31,18 @@ export default function LockScreen({ onUnlock }: LockScreenProps) {
     setTimeout(onUnlock, UNLOCK_MS);
   };
 
-  // keep focus on the button and let Enter or Space work wherever focus has drifted
+  // Tab stays on the lock screen's two controls; Enter or Space logs in wherever focus has drifted,
+  // except on Close, which keeps its own Enter.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Tab") { e.preventDefault(); btnRef.current?.focus(); }
-      else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); unlock(); }
+      if (e.key === "Tab") {
+        e.preventDefault();
+        const other = document.activeElement === btnRef.current ? closeRef.current : btnRef.current;
+        other?.focus();
+      } else if ((e.key === "Enter" || e.key === " ") && document.activeElement !== closeRef.current) {
+        e.preventDefault();
+        unlock();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -44,6 +52,9 @@ export default function LockScreen({ onUnlock }: LockScreenProps) {
 
   return (
     <div className="os-lock" data-unlocking={unlocking || undefined} role="dialog" aria-modal="true" aria-label="Lock screen">
+      <button ref={closeRef} type="button" className="os-lock__close" aria-label="Close the laptop" onClick={onExit}>
+        Close
+      </button>
       <div className="os-lock__top">
         <div className="os-lock__date">{date}</div>
         <div className="os-lock__clock">{clock(now)}</div>

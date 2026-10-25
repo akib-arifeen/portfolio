@@ -205,6 +205,7 @@ export type MenuBarProps = {
   onSearch(): void;
   onControlCentre(): void;
   controlCentreOpen: boolean;
+  onExit(): void;                    // close the laptop and go back to the page
 };
 export type SearchProps = { open: boolean; onClose(): void; onPick(item: SearchItem): void };
 export type ControlCentreProps = {
@@ -222,7 +223,7 @@ export type NotificationsProps = {
   onDismiss(id: string): void;
   onAct(id: string): void;
 };
-export type LockScreenProps = { onUnlock(): void };
+export type LockScreenProps = { onUnlock(): void; onExit(): void };
 export type WallpaperProps = { appearance: Appearance };
 export type DesktopIconsProps = { onOpen(path: string): void };
 export type AppIconProps = { id: AppId; size?: number };

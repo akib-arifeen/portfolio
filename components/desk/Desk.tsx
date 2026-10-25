@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import OsShell from "@/components/os/OsShell";
 import PhoneShell from "@/components/os/PhoneShell";
+import { useScrollLock } from "@/lib/use-scroll-lock";
 
 function useWide() {
   const [wide, setWide] = useState<boolean | null>(null);
@@ -22,6 +23,8 @@ export default function Desk({ onClose }: { onClose: () => void }) {
   const wide = useWide();
   const [leaving, setLeaving] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  // the page behind the laptop must not scroll while it is open
+  useScrollLock();
 
   const close = useCallback(() => {
     setLeaving(true);

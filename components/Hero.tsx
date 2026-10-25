@@ -11,6 +11,7 @@ import { phaseForHour, phases, type Phase } from "./studio/palette";
 import BoothExperience from "./booth/BoothExperience";
 import AskAkib, { type AkibState } from "./twin/AskAkib";
 import { SiteNav } from "./SiteNav";
+import SoundToggle, { SpeakerIcon } from "./SoundToggle";
 
 const Studio = dynamic(() => import("./studio/Studio"), { ssr: false });
 const Desk = dynamic(() => import("./desk/Desk"), { ssr: false });
@@ -42,8 +43,14 @@ function useAutoPhase() {
   return auto;
 }
 
-/** The ticking clock owns its own state, so a tick re-renders this button and nothing else. Not a live region: a screen reader would announce every change. */
-function ClockButton({ phase, onClick }: { phase: Phase; onClick: () => void }) {
+/**
+ * The ticking clock owns its own state, so a tick re-renders this button and nothing else. Not a live region: a screen reader would announce every change.
+ *
+ * The time and the light only belong together while the light follows the visitor's hour. Once they
+ * pick a light, the clock keeps ticking, so showing the real time next to it would claim that the
+ * studio is lit by "21:40 · morning". The chosen light is named on its own instead.
+ */
+function ClockButton({ phase, overridden, onClick }: { phase: Phase; overridden: boolean; onClick: () => void }) {
   const [time, setTime] = useState("--:--");
   useEffect(() => {
     const tick = () => setTime(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }));
@@ -52,8 +59,13 @@ function ClockButton({ phase, onClick }: { phase: Phase; onClick: () => void }) 
     return () => clearInterval(id);
   }, []);
   return (
-    <button type="button" className="tool tool--clock" onClick={onClick} aria-label={`Light: ${phase}. Change the light`}>
-      {time} · {phase}
+    <button
+      type="button"
+      className="tool tool--clock"
+      onClick={onClick}
+      aria-label={overridden ? `Light: ${phase}, chosen by you. Change the light` : `Light: ${phase}, from your local time. Change the light`}
+    >
+      {overridden ? <>Light: {phase}</> : <>{time} · {phase}</>}
     </button>
   );
 }
@@ -260,10 +272,7 @@ export default function Hero() {
   return (
     <>
       <SiteNav wordmarkHref="#top">
-        <button className="chip chip--icon" type="button" aria-pressed={soundOn} onClick={toggleSound}>
-          <SpeakerIcon on={soundOn} />
-          <span className="chip__label">{soundOn ? "Sound on" : "Sound off"}</span>
-        </button>
+        <SoundToggle on={soundOn} onToggle={toggleSound} />
       </SiteNav>
 
       <section className="hero" id="top" aria-label="Studio">
@@ -332,7 +341,7 @@ export default function Hero() {
               <div className="detail__head">
                 <p className="detail__kicker" id="detail-kicker" tabIndex={-1}>{kicker}</p>
                 <div className="detail__tools">
-                  <ClockButton phase={phase} onClick={cycleLight} />
+                  <ClockButton phase={phase} overridden={override !== null} onClick={cycleLight} />
                   <button
                     type="button"
                     className="tool"
@@ -449,11 +458,3 @@ function HomeIcon() {
   );
 }
 
-function SpeakerIcon({ on }: { on: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 9h3l5-4v14l-5-4H4z" />
-      {on ? <path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11" /> : <path d="M17 9l5 6M22 9l-5 6" />}
-    </svg>
-  );
-}

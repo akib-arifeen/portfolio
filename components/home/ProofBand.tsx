@@ -17,7 +17,7 @@ export default function ProofBand() {
         <ul className="proof__list">
           {proof.map((p) => (
             <li className="proof__cell" key={p.href} data-reveal>
-              <Link className="proof__item" href={p.href}>
+              <Link className="proof__item" href={p.href} aria-label={`${p.value} ${p.label} ${p.cue}`}>
                 <span className="proof__num"><CountUp text={p.value} /></span>
                 <span className="proof__label">{p.label}</span>
                 <span className="proof__cue">{p.cue} <span aria-hidden="true">&rarr;</span></span>

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CATEGORIES, projectEntries, projectsIn, resolveShow } from "@/lib/projects";
 import { MediaGallery } from "@/components/projects/MediaGallery";
 import { SiteNav } from "@/components/SiteNav";
+import SoundToggle from "@/components/SoundToggle";
 import "../work.css";
 import "../projects.css";
 
@@ -13,6 +14,8 @@ export const metadata: Metadata = {
   title: "Projects",
   description: DESCRIPTION,
   openGraph: { title: "Projects · Akib Arifeen", description: DESCRIPTION },
+  // one canonical for the whole catalogue: the ?show= filter is a view of it, not a different page
+  alternates: { canonical: "/projects" },
 };
 
 type Props = { searchParams: Promise<{ show?: string }> };
@@ -32,7 +35,9 @@ export default async function ProjectsPage({ searchParams }: Props) {
 
   return (
     <main className="wrap projects">
-      <SiteNav current="/projects" />
+      <SiteNav current="/projects">
+        <SoundToggle />
+      </SiteNav>
 
       <header className="projects__head">
         <p className="kicker">Everything I have built</p>

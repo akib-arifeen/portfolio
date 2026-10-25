@@ -27,6 +27,7 @@ export function FilmFrame({ film }: { film: Film }) {
           <video
             className="gpiece__video"
             controls
+            playsInline
             preload="none"
             poster={film.poster}
             width={film.w}

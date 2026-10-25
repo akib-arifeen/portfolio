@@ -60,6 +60,7 @@ Never commit `.env.local`.
 | `npm run start` | Serve the production build |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm test` | `vitest run` (unit tests in `tests/unit`) |
+| `node scripts/check-scroll-lock.mjs` | Opt-in browser check for the page lock behind the booth and the laptop: needs Playwright (`PLAYWRIGHT_MODULE`) and a running production build. Not part of `npm test`. |
 
 ## Project structure
 

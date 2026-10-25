@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const item = playItems.find((p) => p.slug === slug);
   if (!item) return {};
   const title = `${item.name} · Akib Arifeen`;
-  return { title: item.name, description: item.blurb, openGraph: { title, description: item.blurb } };
+  return { title: item.name, description: item.blurb, openGraph: { title, description: item.blurb }, alternates: { canonical: `/play/${slug}` } };
 }
 
 export default async function PlayPage({ params }: Props) {
