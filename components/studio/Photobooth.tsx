@@ -36,7 +36,6 @@ const ART = {
   paperDeep: "#d8ccb9",
   charcoal: "#363b41",
   warm: "#b96a45",
-  glow: "#ffe3bf",
 };
 
 type Fonts = { display: string; mono: string };
@@ -254,11 +253,15 @@ export function Booth({ phase }: { phase: Phase }) {
   const art = useBoothArt(fontsReady);
   const mats = useMaterials();
   const warm = useRef<THREE.PointLight>(null);
+  const screenLit = useRef<THREE.MeshStandardMaterial>(null);
 
   useFrame((_, dt) => {
-    if (!warm.current) return;
+    const k = 1 - Math.exp(-dt * 2);
     const target = phase === "night" ? 1.5 : phase === "evening" ? 1.1 : phase === "morning" ? 0.55 : 0.4;
-    warm.current.intensity += (target - warm.current.intensity) * (1 - Math.exp(-dt * 2));
+    if (warm.current) warm.current.intensity += (target - warm.current.intensity) * k;
+    // the screen is the cabinet's second light: it reads brighter as the room darkens
+    const glow = 0.44 + target * 0.19;
+    if (screenLit.current) screenLit.current.emissiveIntensity += (glow - screenLit.current.emissiveIntensity) * k;
   });
 
   return (
@@ -289,7 +292,7 @@ export function Booth({ phase }: { phase: Phase }) {
       <RoundedBox args={[SCREEN_W + 0.06, SCREEN_H + 0.06, 0.024]} radius={0.012} smoothness={3} position={[0, SCREEN_Y, FRONT_Z + 0.012]} material={mats.ink} />
       <mesh position={[0, SCREEN_Y, FRONT_Z + 0.026]}>
         <planeGeometry args={[SCREEN_W, SCREEN_H]} />
-        <meshStandardMaterial map={art.screen} emissive="#ffffff" emissiveMap={art.screen} emissiveIntensity={0.52} roughness={0.4} />
+        <meshStandardMaterial ref={screenLit} map={art.screen} emissive="#ffffff" emissiveMap={art.screen} emissiveIntensity={0.52} roughness={0.4} />
       </mesh>
 
       {/* lens at standing eye height, with a small warm ring */}
@@ -323,8 +326,9 @@ export function Booth({ phase }: { phase: Phase }) {
         <meshStandardMaterial map={art.plate} roughness={0.6} />
       </mesh>
 
-      {/* instructions on the visible side, not a decorative poster */}
-      <group position={[CAB_W / 2 + 0.008, 1.26, 0]} rotation={[0, Math.PI / 2, 0]}>
+      {/* instructions hang on the side the camera sees: BOOTH_ROT turns local -x into the room and
+          local +x into the back wall, so the +x side would be read by nobody */}
+      <group position={[-CAB_W / 2 - 0.008, 1.26, 0]} rotation={[0, -Math.PI / 2, 0]}>
         <Box size={[0.48, 0.62, 0.012]} position={[0, 0, 0]} color={c.boothPanelEdge} />
         <mesh position={[0, 0, 0.007]}>
           <planeGeometry args={[0.44, 0.56]} />

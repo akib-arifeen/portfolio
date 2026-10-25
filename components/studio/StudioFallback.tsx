@@ -13,7 +13,7 @@ export default function StudioFallback({ selected }: StudioProps) {
       <img
         className="studio-fallback__room"
         src="/studio/room-poster.jpg"
-        alt="A still of my studio: a desk with a monitor and a laptop, a dark photo booth against the wall, a shelf and a window."
+        alt="A still of my studio: Akib sits at the desk working on his laptop, with a monitor, a dark photo booth against the wall, a shelf and a window."
       />
       {selected && <span className="studio-fallback__note">The 3D room needs WebGL, but everything in it still opens from the buttons.</span>}
     </div>

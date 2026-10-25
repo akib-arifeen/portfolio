@@ -114,7 +114,7 @@ export default function BoothScreen({ booth: b, onStepAway }: { booth: Booth; on
             <>
               <h2 className="booth__title" id="booth-heading" data-booth-heading tabIndex={-1}>Step up and say cheese.</h2>
               <p className="booth__text">
-                The kiosk in the room is a model of the booth I built: a camera, four looks and a card.
+                The kiosk in the room is a model of the booth I built: a camera, {styles.length} looks and a card.
                 Nothing you take is stored here.
               </p>
               <ol className="booth__steps">
@@ -235,7 +235,7 @@ export default function BoothScreen({ booth: b, onStepAway }: { booth: Booth; on
           {b.step === "done" && (
             <>
               <h2 className="booth__title" id="booth-heading" data-booth-heading tabIndex={-1}>
-                {b.problem ? "Here’s your print." : "Here’s your card."}
+                Here’s your card.
               </h2>
               <p className="booth__text">
                 {b.problem === "not-configured"

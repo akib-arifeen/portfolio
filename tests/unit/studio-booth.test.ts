@@ -30,6 +30,11 @@ describe("the booth is functional equipment, not a set piece", () => {
     expect(booth).toContain("new THREE.Vector3(-2.72, 0, -1.35)");
     expect(studio).toMatch(/booth: \[BOOTH_POS\.x/);
   });
+
+  it("hangs its instructions on the side the camera sees, not the back wall", () => {
+    // BOOTH_ROT turns local -x into the room; a +x poster renders facing the wall and can never be read
+    expect(booth).toMatch(/position=\{\[-CAB_W \/ 2 - 0\.008, 1\.26, 0\]\} rotation=\{\[0, -Math\.PI \/ 2, 0\]\}/);
+  });
 });
 
 describe("the palette keeps the room's booth quiet", () => {
@@ -63,6 +68,10 @@ describe("the booth dialog explains the real booth honestly", () => {
     expect(boothScreen).toContain("The kiosk in the room is a model of the booth I built");
     expect(boothScreen).toContain("This page is the demo");
     expect(boothScreen).toContain("shown in demo mode with my own photo");
+    // the look count comes from the data, and the result is a card, never a physical print
+    expect(boothScreen).toContain("{styles.length} looks");
+    expect(boothScreen).toContain("Here’s your card.");
+    expect(boothScreen).not.toMatch(/Here’s your print/);
   });
 
   it("does not claim a physical print was tested here", () => {
