@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { playItems } from "@/lib/os/playground";
 import type { PlayItem } from "@/lib/os/types";
-import { samePageLayer, STUDIO_OPEN_EVENT, type StudioLayer } from "@/lib/hash-nav";
+import { tileIntent, STUDIO_OPEN_EVENT, type StudioLayer } from "@/lib/hash-nav";
 
 type Tile = { key: string; name: string; blurb: string; status: PlayItem["status"]; href: string };
 
@@ -24,15 +24,16 @@ const tiles: Tile[] = [
 
 /** A hash link cannot reopen a layer that is already in the address bar: no hashchange fires, so the tile asks Hero directly. */
 function openLayer(e: React.MouseEvent<HTMLAnchorElement>, href: string) {
-  const target = samePageLayer(href, window.location.pathname, window.location.hash);
-  if (!target) return;
+  const intent = tileIntent(e, href, window.location.pathname, window.location.hash);
+  // a modified or non-primary click is the browser's (new tab, new window): leave the link alone
+  if (intent.kind === "ignore") return;
   e.preventDefault();
-  if (target.alreadyThere) {
-    window.dispatchEvent(new CustomEvent<StudioLayer>(STUDIO_OPEN_EVENT, { detail: target.layer }));
+  if (intent.kind === "reopen") {
+    window.dispatchEvent(new CustomEvent<StudioLayer>(STUDIO_OPEN_EVENT, { detail: intent.layer }));
     return;
   }
   // Let the address bar carry the state, exactly as following the link would, so Back still works.
-  window.location.hash = target.hash;
+  window.location.hash = intent.hash;
 }
 
 export default function PlayStrip() {

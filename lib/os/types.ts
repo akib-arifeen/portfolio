@@ -166,6 +166,7 @@ export type PlayItem = {
   url?: string;          // where it runs; iframed in Playground when `embeddable`
   embeddable: boolean;
   allow?: string;        // iframe `allow` attribute, e.g. "autoplay; microphone; fullscreen"
+  sandbox?: string;      // iframe `sandbox` attribute when the default set is too tight for the game
   workSlug?: string;
 };
 

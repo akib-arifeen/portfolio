@@ -36,7 +36,7 @@ export default async function PlayPage({ params }: Props) {
         </div>
       </header>
       {item.embeddable ? (
-        <PlayFrame src={item.url} title={item.name} allow={item.allow} />
+        <PlayFrame src={item.url} title={item.name} allow={item.allow} sandbox={item.sandbox} />
       ) : (
         <div className="play__card">
           <h2>{item.name}</h2>

@@ -70,6 +70,18 @@ function ClockButton({ phase, overridden, onClick }: { phase: Phase; overridden:
   );
 }
 
+/** The element the visitor was on when a layer opened, unless that is the page itself. */
+function focusedTrigger(): HTMLElement | null {
+  const el = document.activeElement;
+  return el instanceof HTMLElement && el !== document.body && el !== document.documentElement ? el : null;
+}
+
+/** Give focus back to whatever opened the overlay; the chip is only the home for a deep link or a trigger that left the page. */
+function restoreFocus(trigger: HTMLElement | null, fallback: HTMLElement | null) {
+  const target = trigger && document.contains(trigger) ? trigger : fallback;
+  target?.focus({ preventScroll: true });
+}
+
 export default function Hero() {
   const reducedMotion = useReducedMotion();
   const [override, setOverride] = useState<Phase | null>(null);
@@ -88,6 +100,8 @@ export default function Hero() {
   const boothChip = useRef<HTMLButtonElement>(null);
   const restoreLaptopFocus = useRef(false);
   const restoreBoothFocus = useRef(false);
+  const deskTrigger = useRef<HTMLElement | null>(null);
+  const boothTrigger = useRef<HTMLElement | null>(null);
   const stage = useRef<HTMLDivElement>(null);
   const deskTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -108,6 +122,7 @@ export default function Hero() {
 
   const openLaptop = useCallback(() => {
     cancelDeskOpen();
+    deskTrigger.current = focusedTrigger() ?? laptopChip.current;
     setSelected("laptop");
     setExplore(false);
     setBoothOpen(false); // the desk and the booth never stack
@@ -118,6 +133,7 @@ export default function Hero() {
 
   const openBooth = useCallback(() => {
     cancelDeskOpen(); // a pending laptop open must not land behind the booth
+    boothTrigger.current = focusedTrigger() ?? boothChip.current;
     setDeskOpen(false);
     studioSound.blip("open");
     setSelected(null);
@@ -169,31 +185,47 @@ export default function Hero() {
     requestAnimationFrame(() => askChip.current?.focus({ preventScroll: true }));
   }, []);
 
+  /** Drop the hash a layer put in the address bar: no new history entry, and replaceState does not scroll. */
+  const clearLayerHash = useCallback((layer: StudioLayer) => {
+    if (studioLayerFromHash(window.location.hash) !== layer) return;
+    history.replaceState(history.state, "", window.location.pathname + window.location.search);
+  }, []);
+
   const closeDesk = useCallback(() => {
     cancelDeskOpen();
     setDeskOpen(false);
     setSelected(null);
+    clearLayerHash("laptop");
     restoreLaptopFocus.current = true;
-  }, [cancelDeskOpen]);
+  }, [cancelDeskOpen, clearLayerHash]);
 
   const closeBooth = useCallback(() => {
     setBoothOpen(false);
+    clearLayerHash("booth");
     restoreBoothFocus.current = true;
-  }, []);
+  }, [clearLayerHash]);
+
+  /** The layer a Back (or an edited address) just closed. Only one layer can be open. */
+  const closeOpenLayer = useCallback(() => {
+    if (deskOpen) closeDesk();
+    else if (boothOpen) closeBooth();
+  }, [deskOpen, boothOpen, closeDesk, closeBooth]);
+  const closeLayerRef = useRef(closeOpenLayer);
+  closeLayerRef.current = closeOpenLayer;
 
   // the page behind the laptop is inert until Desk unmounts, so focus can only return once deskOpen has flipped and committed;
   // Desk's cleanup has lifted inert by the time this effect runs, so focus it here rather than on a frame that a hidden tab may never paint
   useEffect(() => {
     if (deskOpen || !restoreLaptopFocus.current) return;
     restoreLaptopFocus.current = false;
-    laptopChip.current?.focus({ preventScroll: true });
+    restoreFocus(deskTrigger.current, laptopChip.current);
   }, [deskOpen]);
 
   // same for the booth dialog: it is gone once boothOpen flips, so focus comes back to the button that opened it
   useEffect(() => {
     if (boothOpen || !restoreBoothFocus.current) return;
     restoreBoothFocus.current = false;
-    requestAnimationFrame(() => boothChip.current?.focus({ preventScroll: true }));
+    requestAnimationFrame(() => restoreFocus(boothTrigger.current, boothChip.current));
   }, [boothOpen]);
 
   const cycleLight = useCallback(() => {
@@ -201,8 +233,13 @@ export default function Hero() {
     setOverride((p) => phases[(phases.indexOf(p ?? autoPhaseRef.current) + 1) % phases.length]);
   }, []);
 
+  // the room tone is a module singleton: after a client-side navigation back here the switch must show its real state,
+  // and after hydration rather than in the initial state, so the server and the client agree
+  useEffect(() => { setSoundOn(studioSound.enabled); }, []);
+
   const toggleSound = async () => {
-    const next = !soundOn;
+    // the singleton is the truth; local state can be one remount behind
+    const next = !studioSound.enabled;
     await studioSound.setEnabled(next);
     setSoundOn(next);
     if (next) studioSound.blip("click");
@@ -229,7 +266,9 @@ export default function Hero() {
   useEffect(() => {
     const follow = () => {
       const layer = studioLayerFromHash(location.hash);
-      if (layer) linkRef.current[layer]();
+      if (layer) { linkRef.current[layer](); return; }
+      // Back (or an edited address) took the layer out of the hash: that is a close, not a reason to reopen on reload
+      closeLayerRef.current();
     };
     follow();
     window.addEventListener("hashchange", follow);
@@ -457,4 +496,3 @@ function HomeIcon() {
     </svg>
   );
 }
-

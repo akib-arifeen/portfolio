@@ -4,6 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import type { LockScreenProps } from "@/lib/os/types";
 
 const UNLOCK_MS = 350;
+const CONTROLS = 2; // Close, then Log in, in DOM order
+
+/** Tab walks the lock screen's two controls in order and Shift+Tab against it; from outside, forward enters at Log in and backward at Close. */
+export function nextLockFocus(current: number, shift: boolean): number {
+  if (current === -1) return shift ? 0 : CONTROLS - 1;
+  return (current + (shift ? -1 : 1) + CONTROLS) % CONTROLS;
+}
 
 function clock(d: Date) {
   return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -31,14 +38,15 @@ export default function LockScreen({ onUnlock, onExit }: LockScreenProps) {
     setTimeout(onUnlock, UNLOCK_MS);
   };
 
-  // Tab stays on the lock screen's two controls; Enter or Space logs in wherever focus has drifted,
-  // except on Close, which keeps its own Enter.
+  // Tab stays on the lock screen's two controls; Shift+Tab goes back. Enter or Space logs in wherever
+  // focus has drifted, except on Close, which keeps its own Enter.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Tab") {
         e.preventDefault();
-        const other = document.activeElement === btnRef.current ? closeRef.current : btnRef.current;
-        other?.focus();
+        const refs = [closeRef, btnRef];
+        const next = refs[nextLockFocus(refs.findIndex((r) => r.current === document.activeElement), e.shiftKey)];
+        next.current?.focus();
       } else if ((e.key === "Enter" || e.key === " ") && document.activeElement !== closeRef.current) {
         e.preventDefault();
         unlock();

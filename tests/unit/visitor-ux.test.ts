@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { nextLockFocus } from "@/components/os/LockScreen";
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const read = (path: string) => readFileSync(`${ROOT}${path}`, "utf8");
@@ -117,6 +118,49 @@ describe("the sound switch", () => {
       expect(page, path).toContain('import SoundToggle from "@/components/SoundToggle"');
       expect(page, path).toMatch(/<SiteNav current="\/[a-z]+">\s*<SoundToggle \/>/);
     }
+  });
+
+  it("takes the studio's switch from the room tone itself, not from a local copy a remount left behind", () => {
+    const hero = read("components/Hero.tsx");
+    expect(hero).toContain("useEffect(() => { setSoundOn(studioSound.enabled); }, [])");
+    expect(hero).toContain("const next = !studioSound.enabled;");
+  });
+});
+
+describe("focus after an overlay closes", () => {
+  const hero = read("components/Hero.tsx");
+
+  it("remembers what opened the layer", () => {
+    expect(hero).toContain("deskTrigger.current = focusedTrigger() ?? laptopChip.current");
+    expect(hero).toContain("boothTrigger.current = focusedTrigger() ?? boothChip.current");
+  });
+
+  it("gives it back, and falls back to the chip only when the trigger is gone", () => {
+    expect(hero).toContain("restoreFocus(deskTrigger.current, laptopChip.current)");
+    expect(hero).toContain("restoreFocus(boothTrigger.current, boothChip.current)");
+    expect(hero).toContain("trigger && document.contains(trigger) ? trigger : fallback");
+    expect(hero).toContain("focus({ preventScroll: true })");
+  });
+});
+
+describe("the lock screen's tab order", () => {
+  it("walks its two controls forward and back, with wraparound", () => {
+    // 0 = Close, 1 = Log in, in DOM order
+    expect(nextLockFocus(0, false)).toBe(1);
+    expect(nextLockFocus(1, false)).toBe(0);
+    expect(nextLockFocus(0, true)).toBe(1);
+    expect(nextLockFocus(1, true)).toBe(0);
+  });
+
+  it("enters from outside the dialog in the direction of travel", () => {
+    expect(nextLockFocus(-1, false)).toBe(1); // forward reaches Log in
+    expect(nextLockFocus(-1, true)).toBe(0); // Shift+Tab reaches Close, not Log in
+  });
+
+  it("reads the shift key instead of toggling blindly", () => {
+    expect(read("components/os/LockScreen.tsx")).toContain(
+      "nextLockFocus(refs.findIndex((r) => r.current === document.activeElement), e.shiftKey)",
+    );
   });
 });
 
