@@ -10,7 +10,7 @@ import "../work.css";
 import "../blog.css";
 
 const DESCRIPTION =
-  "Case studies and essays about the work: the ask, the decisions I made, the code that mattered and what came of it.";
+  "Blogs about the work: the ask, the decisions I made, the code that mattered and what came of it.";
 
 export const metadata: Metadata = {
   title: "Blog",
@@ -37,7 +37,7 @@ export default function BlogIndex() {
       </SiteNav>
 
       <header className="work__head">
-        <p className="kicker">Case studies and essays</p>
+        <p className="kicker">Blogs and build notes</p>
         <h1 className="work__h1">Blog</h1>
         <p className="work__lede">{DESCRIPTION}</p>
       </header>
@@ -67,7 +67,7 @@ export default function BlogIndex() {
 
       <section className="wgroup" aria-labelledby="stories-h">
         <div className="wgroup__head">
-          <h2 id="stories-h" className="wgroup__title">More project stories</h2>
+          <h2 id="stories-h" className="wgroup__title">More Blogs</h2>
           <p className="wgroup__lede">
             The rest of the catalogue: the work that is live first, then what is still in progress or a concept.
           </p>

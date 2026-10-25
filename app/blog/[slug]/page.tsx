@@ -103,7 +103,7 @@ function CaseArticle({ work }: { work: Work }) {
           </section>
         ) : null}
 
-        <nav className="pn" aria-label="More case studies">
+        <nav className="pn" aria-label="More Blogs">
           {prev ? (
             <Link href={prev.href} className="pn__a" rel="prev"><span className="pn__dir">Previous</span><span className="pn__t">{prev.title}</span></Link>
           ) : <span />}

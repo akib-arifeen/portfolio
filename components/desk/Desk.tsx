@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import ProjectPortal from "@/components/portal/ProjectPortal";
+import { studioSound } from "@/lib/sound";
 import { useScrollLock } from "@/lib/use-scroll-lock";
 import "@/components/portal/portal.css";
 
 const FOCUSABLE = "a[href], button:not([disabled]), video[controls], iframe, [tabindex]:not([tabindex='-1'])";
 
-export default function Desk({ onClose }: { onClose: () => void }) {
+export default function Desk({ onClose, phone = false }: { onClose: () => void; phone?: boolean }) {
   const [leaving, setLeaving] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -16,8 +17,9 @@ export default function Desk({ onClose }: { onClose: () => void }) {
 
   const close = useCallback(() => {
     if (closeTimer.current) return;
+    studioSound.blip("click");
     setLeaving(true);
-    closeTimer.current = setTimeout(onClose, 160);
+    closeTimer.current = setTimeout(onClose, 140);
   }, [onClose]);
 
   useEffect(() => {
@@ -60,8 +62,8 @@ export default function Desk({ onClose }: { onClose: () => void }) {
   }, []);
 
   return createPortal(
-    <div className="desk" data-leaving={leaving} ref={root} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Akib’s laptop">
-      <ProjectPortal onClose={close} />
+    <div className="desk" data-leaving={leaving} ref={root} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`Akib’s ${phone ? "phone" : "laptop"}`}>
+      <ProjectPortal onClose={close} phone={phone} />
     </div>,
     document.body,
   );

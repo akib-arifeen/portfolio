@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { scene } from "@/components/studio/palette";
-import { AKIB_POSITION, AKIB_TORSO_FORWARD_REACH } from "@/components/studio/Akib";
+import { AVATAR_FACING, AVATAR_ORIGIN } from "@/lib/studio/avatar";
 import { DESK_BACK_EDGE_Z, DESK_CENTER, DESK_DEPTH } from "@/components/studio/Room";
 import { LAPTOP_POS } from "@/components/studio/Studio";
 
@@ -9,7 +9,6 @@ const read = (path: string) => readFileSync(new URL(`../../${path}`, import.meta
 
 const booth = read("components/studio/Photobooth.tsx");
 const studio = read("components/studio/Studio.tsx");
-const akib = read("components/studio/Akib.tsx");
 const boothScreen = read("components/booth/BoothScreen.tsx");
 
 describe("the booth is functional equipment, not a set piece", () => {
@@ -55,16 +54,16 @@ describe("the palette keeps the room's booth quiet", () => {
 });
 
 describe("the workstation is physically coherent", () => {
-  it("places the sitter behind the desk with no torso in the desktop volume", () => {
-    expect(akib).toContain("position={AKIB_POSITION}");
-    expect(akib).toContain("rotation={[0, 1.62, 0]}");
-    expect(AKIB_POSITION[2] + AKIB_TORSO_FORWARD_REACH).toBeLessThan(DESK_BACK_EDGE_Z);
+  it("keeps the avatar slot behind the desk, out of the desktop volume", () => {
+    expect(studio).toContain("<Avatar pose={phone ? \"phone_idle\" : \"laptop_idle\"}");
+    expect(AVATAR_FACING).toBeCloseTo(0.55); // turned from the stool toward the laptop
+    expect(AVATAR_ORIGIN[2]).toBeLessThan(DESK_BACK_EDGE_Z);
   });
 
   it("puts the laptop on the desktop within natural arm reach", () => {
     expect(LAPTOP_POS[2]).toBeGreaterThan(DESK_BACK_EDGE_Z);
     expect(LAPTOP_POS[2]).toBeLessThan(DESK_CENTER[2] + DESK_DEPTH / 2);
-    expect(Math.abs(LAPTOP_POS[2] - AKIB_POSITION[2])).toBeLessThan(0.85);
+    expect(Math.abs(LAPTOP_POS[2] - AVATAR_ORIGIN[2])).toBeLessThan(0.85);
     expect(LAPTOP_POS[1]).toBeGreaterThan(DESK_CENTER[1]);
   });
 

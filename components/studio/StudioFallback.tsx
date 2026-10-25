@@ -24,7 +24,7 @@ export default function StudioFallback({ selected }: StudioProps) {
           height={900}
           loading="eager"
           fetchPriority="high"
-          alt="A still of my studio: Akib sits at a walnut desk working on his laptop, with a project monitor, a warm lamp and shelves."
+          alt="A still of my studio in the evening: a game character with dark hair and rectangular glasses using a laptop at a walnut desk, with a warm lamp and shelves."
         />
       </picture>
       {selected && <span className="studio-fallback__note">The 3D room needs WebGL, but everything in it still opens from the buttons.</span>}

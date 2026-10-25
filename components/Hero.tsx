@@ -8,7 +8,7 @@ import { studioLayerFromHash, STUDIO_OPEN_EVENT, type StudioLayer } from "@/lib/
 import { studioSound } from "@/lib/sound";
 import { phaseForHour, phases, type Phase } from "./studio/palette";
 import BoothExperience from "./booth/BoothExperience";
-import AskAkib, { type AkibState } from "./twin/AskAkib";
+import AskAkib from "./twin/AskAkib";
 import { SiteNav } from "./SiteNav";
 import SoundToggle, { SpeakerIcon } from "./SoundToggle";
 
@@ -16,7 +16,7 @@ const Studio = dynamic(() => import("./studio/Studio"), { ssr: false });
 const Desk = dynamic(() => import("./desk/Desk"), { ssr: false });
 
 /** The room, minus the laptop and the booth: both have their own primary action. */
-const roomLinks: StudioSpot[] = ["video", "lessons", "zoom", "workout", "culinary", "mic", "me"];
+const roomLinks: StudioSpot[] = ["lessons", "zoom", "workout", "culinary", "me"];
 
 function useReducedMotion() {
   const [reduced, setReduced] = useState(false);
@@ -28,6 +28,18 @@ function useReducedMotion() {
     return () => mq.removeEventListener("change", on);
   }, []);
   return reduced;
+}
+
+function usePhoneLayout() {
+  const [phone, setPhone] = useState<boolean | null>(null);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 47.99rem)");
+    const update = () => setPhone(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return phone;
 }
 
 /** The light follows the visitor's hour. Holds only the phase, so the 30 s tick re-renders Hero (and the whole Studio) only when the phase really changes. */
@@ -83,15 +95,15 @@ function restoreFocus(trigger: HTMLElement | null, fallback: HTMLElement | null)
 
 export default function Hero() {
   const reducedMotion = useReducedMotion();
+  const phoneLayout = usePhoneLayout();
   const [override, setOverride] = useState<Phase | null>(null);
   const [selected, setSelected] = useState<StudioSpot | null>(null);
-  const [soundOn, setSoundOn] = useState(false);
+  const [soundOn, setSoundOn] = useState(true);
   const [moreOpen, setMoreOpen] = useState(false);
   const [explore, setExplore] = useState(false);
   const [deskOpen, setDeskOpen] = useState(false);
   const [boothOpen, setBoothOpen] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
-  const [akib, setAkib] = useState<AkibState | null>(null);
 
   const panelTitle = useRef<HTMLHeadingElement>(null);
   const askChip = useRef<HTMLButtonElement>(null);
@@ -171,7 +183,7 @@ export default function Hero() {
     setExplore(false);
     setSelected("me");
     setAskOpen(true);
-    // on narrow screens the stage sits above the detail: bring it back so the character is visible while it talks
+    // on narrow screens the stage sits above the detail: bring it back so the room stays in view
     if (window.matchMedia("(max-width: 59.99rem)").matches) {
       stage.current?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
     }
@@ -179,7 +191,6 @@ export default function Hero() {
 
   const closeAsk = useCallback(() => {
     setAskOpen(false);
-    setAkib(null);
     requestAnimationFrame(() => askChip.current?.focus({ preventScroll: true }));
   }, []);
 
@@ -233,7 +244,7 @@ export default function Hero() {
 
   // the room tone is a module singleton: after a client-side navigation back here the switch must show its real state,
   // and after hydration rather than in the initial state, so the server and the client agree
-  useEffect(() => { setSoundOn(studioSound.enabled); }, []);
+  useEffect(() => { setSoundOn(studioSound.loadPreference()); }, []);
 
   const toggleSound = async () => {
     // the singleton is the truth; local state can be one remount behind
@@ -320,7 +331,7 @@ export default function Hero() {
             <p className="hero__note">Architecture, reliable infrastructure, and interfaces people can use.</p>
             <div className="hero__actions">
               <button ref={laptopChip} type="button" className="action action--primary" onClick={openLaptop}>
-                Open engineering case files
+                {phoneLayout === null ? "Open my workspace" : phoneLayout ? "Open my phone" : "Open my laptop"}
                 <span className="action__go" aria-hidden="true">↗</span>
               </button>
               <button ref={boothChip} type="button" className="action" onClick={openBooth} aria-haspopup="dialog">
@@ -357,18 +368,19 @@ export default function Hero() {
 
           <div className="hero__stage-col">
             <div className="hero__stage" data-explore={explore ? "true" : "false"} ref={stage}>
-              <Studio
-                phase={phase}
-                selected={selected}
-                onSelect={select}
-                onCycleLight={cycleLight}
-                onHover={hoverBlip}
-                reducedMotion={reducedMotion}
-                paused={deskOpen || boothOpen}
-                explore={explore}
-                akibPose={akib?.pose}
-                akibMouth={akib?.mouth}
-              />
+              {phoneLayout === null ? null : (
+                <Studio
+                  phase={phase}
+                  selected={selected}
+                  onSelect={select}
+                  onCycleLight={cycleLight}
+                  onHover={hoverBlip}
+                  reducedMotion={reducedMotion}
+                  paused={deskOpen || boothOpen}
+                  explore={explore}
+                  phone={phoneLayout}
+                />
+              )}
             </div>
 
             <section className="detail" aria-label="Studio detail">
@@ -447,8 +459,8 @@ export default function Hero() {
         </div>
       </section>
 
-      <AskAkib open={askOpen} onClose={closeAsk} onAkib={setAkib} soundOn={soundOn} onToggleSound={toggleSound} />
-      {deskOpen && <Desk onClose={closeDesk} />}
+      <AskAkib open={askOpen} onClose={closeAsk} soundOn={soundOn} onToggleSound={toggleSound} />
+      {deskOpen && <Desk onClose={closeDesk} phone={phoneLayout === true} />}
       {boothOpen && <BoothExperience onClose={closeBooth} reducedMotion={reducedMotion} />}
     </>
   );

@@ -83,7 +83,7 @@ export const studioNotes: Record<"mic" | "me", { kicker: string; title: string; 
   me: {
     kicker: "At the workstation",
     title: "Ask about the build",
-    body: "A stylised avatar at my desk. Ask me about the agent pipelines, render infrastructure, product decisions and verification behind the work, out loud if your sound is on.",
+    body: "My seat at the workstation, next to the laptop. Ask me about the agent pipelines, render infrastructure, product decisions and verification behind the work, out loud if your sound is on.",
     outcome: "Software engineer · Hong Kong",
   },
 };

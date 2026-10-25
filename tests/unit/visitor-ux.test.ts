@@ -122,7 +122,7 @@ describe("the sound switch", () => {
 
   it("takes the studio's switch from the room tone itself, not from a local copy a remount left behind", () => {
     const hero = read("components/Hero.tsx");
-    expect(hero).toContain("useEffect(() => { setSoundOn(studioSound.enabled); }, [])");
+    expect(hero).toContain("useEffect(() => { setSoundOn(studioSound.loadPreference()); }, [])");
     expect(hero).toContain("const next = !studioSound.enabled;");
   });
 });

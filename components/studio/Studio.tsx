@@ -5,7 +5,7 @@ import { Instance, Instances, OrbitControls, PerformanceMonitor, PerspectiveCame
 import { Component, memo, useCallback, useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from "react";
 import * as THREE from "three";
 import { Bevel, Box, Cyl, Room } from "./Room";
-import Akib, { type AkibPose } from "./Akib";
+import Avatar from "./Avatar";
 import StudioFallback from "./StudioFallback";
 import { lights, scene as c, type Phase } from "./palette";
 import { BOOTH_POS, Booth } from "./Photobooth";
@@ -19,15 +19,14 @@ type OrbitHandle = ComponentRef<typeof OrbitControls>;
 const CLICK_SLOP = 4;
 
 /** Where the camera looks when a spot is selected. */
-export const spotFocus: Record<StudioSpot, V3> = {
-  video: [-1.72, 1.95, -3.06],
+export const spotFocus: Partial<Record<StudioSpot, V3>> = {
   booth: [BOOTH_POS.x, 1.05, BOOTH_POS.z],
   lessons: [1.35, 2.15, -2.85],
   zoom: [1.95, 2.15, -2.85],
   workout: [2.55, 2.1, -2.85],
   culinary: [1.65, 1.45, -2.85],
   mic: [0.62, 1.5, -2.0],
-  me: [-0.45, 1.55, -2.85],
+  me: [-0.45, 1.22, -2.75],
   laptop: [-0.02, 1.18, -2.15],
 };
 
@@ -41,10 +40,8 @@ export type StudioProps = {
   paused?: boolean;
   /** Direct manipulation: drag to orbit the room within its front arc. */
   explore: boolean;
-  /** Overrides the character's pose (the "Ask Akib" panel drives it); undefined keeps the default. */
-  akibPose?: AkibPose;
-  /** 0 to 1 mouth openness while the pose is "talk". */
-  akibMouth?: number;
+  /** Narrow-screen composition: the avatar's phone pose, set by the phone layout in Hero. */
+  phone?: boolean;
 };
 
 /** Stamps use the wall clock, not R3F's clock: R3F zeroes its clock whenever frameloop flips, which would turn "age" into a huge negative. */
@@ -129,7 +126,7 @@ function Studio(props: StudioProps) {
 
 export default memo(Studio);
 
-function Scene({ phase, selected, onSelect, onCycleLight, onHover, reducedMotion, explore, akibPose, akibMouth, active }: Omit<StudioProps, "paused"> & { active: boolean }) {
+function Scene({ phase, selected, onSelect, onCycleLight, onHover, reducedMotion, explore, phone, active }: Omit<StudioProps, "paused"> & { active: boolean }) {
   const [hovered, setHovered] = useState<StudioSpot | "window" | null>(null);
   const perspective = useRef<THREE.PerspectiveCamera>(null);
   const orbit = useRef<OrbitHandle>(null);
@@ -179,11 +176,9 @@ function Scene({ phase, selected, onSelect, onCycleLight, onHover, reducedMotion
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {spot("video", [0, 0.55, 0], <Monitor phase={phase} playing={active && !reducedMotion && selected === "video"} />)}
       {spot("laptop", [0, 0.45, 0.2], <Laptop />)}
       <Lamp phase={phase} />
-      {spot("mic", [0, 0.75, 0], <Mic />)}
-      {spot("me", [0, 1.25, 0], <Akib reducedMotion={reducedMotion} pose={akibPose ?? (selected === "me" ? "wave" : "typing")} mouth={akibMouth} lookAtPointer headphonesOn={false} />)}
+      {spot("me", [0, 1.25, 0], <Avatar pose={phone ? "phone_idle" : "laptop_idle"} reducedMotion={reducedMotion} />)}
 
       <Bevel size={[2.1, 0.065, 0.45]} position={[1.95, 2.0, -2.88]} color={c.desk} />
       <Bevel size={[2.1, 0.065, 0.45]} position={[1.95, 1.3, -2.88]} color={c.desk} />
@@ -229,8 +224,8 @@ const UP = new THREE.Vector3().crossVectors(RIGHT, ISO_DIR).multiplyScalar(-1).n
 const WORKSTATION = new THREE.Vector3(-0.75, 1.6, -1.65);
 const HOME_TARGET = new THREE.Vector3(-0.2, 1.25, -2.25);
 const DESKTOP_CAMERA = new THREE.Vector3(2.15, 2.15, 2.3);
-const PHONE_TARGET = new THREE.Vector3(-0.15, 1.3, -2.25);
-const PHONE_CAMERA = new THREE.Vector3(1.85, 2.1, 1.6);
+const PHONE_TARGET = new THREE.Vector3(-0.22, 1.32, -2.3);
+const PHONE_CAMERA = new THREE.Vector3(1.55, 1.95, 1.0);
 
 function CameraRig({ cam: camRef, controls: controlsRef, selected, reducedMotion, explore }: { cam: React.RefObject<THREE.PerspectiveCamera | null>; controls: React.RefObject<OrbitHandle | null>; selected: StudioSpot | null; reducedMotion: boolean; explore: boolean }) {
   const { size } = useThree();
@@ -247,13 +242,14 @@ function CameraRig({ cam: camRef, controls: controlsRef, selected, reducedMotion
     if (explore) return;
 
     const phone = size.width < 600;
-    if (selected) goal.set(...spotFocus[selected]);
+    const focus = selected ? spotFocus[selected] : undefined;
+    if (focus) goal.set(...focus);
     else goal.copy(phone ? PHONE_TARGET : HOME_TARGET);
 
     if (selected === "laptop") {
       position.copy(goal).add(new THREE.Vector3(1.05, 0.82, 1.5));
     } else if (selected) {
-      position.copy(goal).addScaledVector(ISO_DIR, selected === "booth" ? 4.1 : 3.7);
+      position.copy(goal).addScaledVector(ISO_DIR, selected === "booth" ? 4.1 : selected === "me" ? 3.3 : 3.7);
     } else {
       position.copy(phone ? PHONE_CAMERA : DESKTOP_CAMERA);
       if (!reducedMotion) position.addScaledVector(RIGHT, state.pointer.x * 0.12).addScaledVector(UP, state.pointer.y * 0.08);
@@ -358,59 +354,6 @@ function Lights({ phase, reducedMotion }: { phase: Phase; reducedMotion: boolean
 }
 
 /* ── Props ───────────────────────────────────────────────────────── */
-
-/** A real project still at rest; only an explicit monitor selection downloads and plays the clip. */
-function useMonitorTexture(playing: boolean) {
-  const poster = useMemo(() => {
-    const t = new THREE.TextureLoader().load("/work/lesson-pipeline/review-page.png");
-    t.colorSpace = THREE.SRGBColorSpace;
-    return t;
-  }, []);
-  const clip = useRef<{ el: HTMLVideoElement; tex: THREE.VideoTexture } | null>(null);
-  const [live, setLive] = useState<THREE.VideoTexture | null>(null);
-
-  useEffect(() => {
-    if (!playing) { clip.current?.el.pause(); setLive(null); return; }
-    if (!clip.current) {
-      const el = document.createElement("video");
-      el.muted = true; el.loop = true; el.playsInline = true;
-      el.setAttribute("muted", ""); el.setAttribute("playsinline", "");
-      el.preload = "none";
-      el.src = "/studio/monitor-loop.mp4";
-      const tex = new THREE.VideoTexture(el);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      clip.current = { el, tex };
-    }
-    const { el, tex } = clip.current;
-    let gone = false;
-    const onPlaying = () => { if (!gone) setLive(tex); };
-    el.addEventListener("playing", onPlaying);
-    el.play().catch(() => {});
-    return () => { gone = true; el.removeEventListener("playing", onPlaying); };
-  }, [playing]);
-
-  useEffect(() => () => {
-    const c = clip.current;
-    if (c) { c.el.pause(); c.el.removeAttribute("src"); c.el.load(); c.tex.dispose(); clip.current = null; }
-    poster.dispose();
-  }, [poster]);
-
-  return playing && live ? live : poster;
-}
-
-function Monitor({ phase, playing }: { phase: Phase; playing: boolean }) {
-  const tex = useMonitorTexture(playing);
-  const tint = useMemo(() => new THREE.Color().setScalar(playing ? 0.82 : Math.min(0.62, 0.43 + 0.1 * lights[phase].screenGlow)), [phase, playing]);
-  return (
-    <group position={[-1.72, 1.95, -3.06]} scale={0.74} rotation={[0, 0.04, 0]}>
-      <Bevel size={[1.72, 1.02, 0.08]} position={[0, 0, 0]} color={c.screenFrame} cast />
-      <mesh position={[0, 0.02, 0.045]}>
-        <planeGeometry args={[1.53, 0.86]} />
-        <meshBasicMaterial map={tex} color={tint} toneMapped={false} />
-      </mesh>
-    </group>
-  );
-}
 
 /** The laptop shows the real video-studio planning interface. */
 function useLaptopScreenTexture() {

@@ -17,9 +17,9 @@ type Props = {
  * that differs between the server and the client would break hydration on a client-side visit.
  */
 export default function SoundToggle({ on, onToggle }: Props) {
-  const [localOn, setLocalOn] = useState(false);
+  const [localOn, setLocalOn] = useState(true);
   useEffect(() => {
-    if (on === undefined) setLocalOn(studioSound.enabled);
+    if (on === undefined) setLocalOn(studioSound.loadPreference());
   }, [on]);
 
   const isOn = on ?? localOn;
