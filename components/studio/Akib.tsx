@@ -586,7 +586,7 @@ export default function Akib(props: AkibProps) {
   const eyeZ = 0.3 * Math.cos(0.42) * Math.cos(eyeLat) + 0.022;
 
   return (
-    <group position={[-0.6, 0.7, -1.88]} rotation={[0, Math.PI, 0]} dispose={null}>
+    <group position={[-0.45, 0.7, -2.5]} rotation={[0, 1.62, 0]} dispose={null}>
       <group scale={0.9}>
         <group ref={hips} position={[0, 0.12, 0]}>
           <mesh geometry={g.unit} material={m.pants} scale={[0.25, 0.14, 0.2]} castShadow />

@@ -15,19 +15,16 @@ export const scene = {
   laptop: "#4d545d",
   laptopEdge: "#3a4048",
   laptopPort: "#2a3038",
-  coral: "#d9714f",     // the photobooth — same hue as --color-accent
+  coral: "#d9714f",     // the one warm accent, shared with --color-accent
   coralDark: "#b8543a",
   cream: "#e8dccb",
-  // the booth identity: lacquer, brass and the mascot's cool light against the warm room
-  boothBrass: "#b58a55",
-  boothInk: "#20252a",
-  boothHalo: "#7fe3e8",
-  ariBlue: "#3aa9e8",
-  ariBlueDeep: "#1d63b4",
-  ariCyan: "#93f6ff",
-  ariGold: "#d9aa58",
-  ariCheek: "#ef9bb0",
-  ariInk: "#14243a",
+  // the booth as quiet equipment: charcoal cabinet, cream face, one warm light. No lacquer, no brass, no mascot.
+  boothCabinet: "#363b41",
+  boothCabinetEdge: "#262b30",
+  boothPanel: "#ded4c4",
+  boothPanelEdge: "#c7bba7",
+  boothInk: "#1d2227",
+  boothGlow: "#ffe0b8",
   rug: "#5d4a38",
   rugInner: "#4d3c2c",
   plantPot: "#9c5f44",
