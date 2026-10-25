@@ -168,11 +168,12 @@ export default function Hero() {
     restoreBoothFocus.current = true;
   }, []);
 
-  // the page behind the laptop is inert until Desk unmounts, so focus can only return once deskOpen has flipped and committed
+  // the page behind the laptop is inert until Desk unmounts, so focus can only return once deskOpen has flipped and committed;
+  // Desk's cleanup has lifted inert by the time this effect runs, so focus it here rather than on a frame that a hidden tab may never paint
   useEffect(() => {
     if (deskOpen || !restoreLaptopFocus.current) return;
     restoreLaptopFocus.current = false;
-    requestAnimationFrame(() => laptopChip.current?.focus({ preventScroll: true }));
+    laptopChip.current?.focus({ preventScroll: true });
   }, [deskOpen]);
 
   // same for the booth dialog: it is gone once boothOpen flips, so focus comes back to the button that opened it
